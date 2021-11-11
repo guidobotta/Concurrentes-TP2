@@ -1,17 +1,15 @@
-
 pub struct Pago {
     id: usize,
     monto_aerolinea: f64,
-    monto_hotel: f64
+    monto_hotel: f64,
 }
-
 
 impl Pago {
     pub fn new(id: usize, monto_aerolinea: f64, monto_hotel: f64) -> Pago {
         let pago = Pago {
             id,
             monto_aerolinea,
-            monto_hotel
+            monto_hotel,
         };
         pago
     }

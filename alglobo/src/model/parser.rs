@@ -1,3 +1,4 @@
+use super::error::Resultado;
 use super::pago::Pago;
 use regex::Regex;
 
@@ -5,7 +6,7 @@ use regex::Regex;
 #[derive(Debug)]
 pub struct Parser {
     reader: io::BufReader<File>,
-    matcher: Regex
+    matcher: Regex,
 }
 
 use std::{
@@ -16,49 +17,46 @@ use std::{
 impl Parser {
     /// Devuelve una instancia de Parser.
     /// Recibe el archivo del que debe leer los request y el logger donde debe notificar lo ejecutado.
-    pub fn new(
-        path: impl AsRef<std::path::Path>
-    ) -> Parser {
-        let file = File::open(path).unwrap();
+    pub fn new(path: impl AsRef<std::path::Path>) -> Resultado<Parser> {
+        let file = File::open(path)?;
         let parser = Parser {
             reader: io::BufReader::new(file),
-            matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$").unwrap()
+            matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$")?,
         };
 
-        //Ok(parser)
-        parser
+        Ok(parser)
     }
 
     /// Parsea el archivo de request.
     /// Metodo bloqueante, finaliza al terminar de procesar los requests.
-    pub fn parsear_pago(&mut self) -> Option<Pago> {
+    pub fn parsear_pago(&mut self) -> Resultado<Option<Pago>> {
         let mut buffer = String::new();
-        
-        loop {
 
-            let bytes = self.reader
-                            .read_line(&mut buffer).unwrap();
+        loop {
+            let bytes = self.reader.read_line(&mut buffer)?;
 
             if bytes == 0 {
-                return None;
+                return Ok(None);
             }
+
             buffer = buffer.replace("\n", "");
 
             let cap = match self.matcher.captures(&buffer) {
                 None => continue,
-                Some(value) => value
+                Some(value) => value,
             };
 
             println!("[Parser] Nuevo pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
                     &cap[1], &cap[2], &cap[3]);
 
-            //Si pasa la regex sabemos el casteo no fallara. 
-            let request = Pago::new(
-                cap[1].parse::<usize>().unwrap(), 
-                cap[2].parse::<f64>().unwrap(), 
-                cap[3].parse::<f64>().unwrap());
-            
-            return Some(request);
+            //Si pasa la regex sabemos el casteo no fallara.
+            let pago = Pago::new(
+                cap[1].parse::<usize>().unwrap(),
+                cap[2].parse::<f64>().unwrap(),
+                cap[3].parse::<f64>().unwrap(),
+            );
+
+            return Ok(Some(pago));
         }
     }
 }
