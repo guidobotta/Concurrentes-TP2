@@ -1,5 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
+mod model;
+use model::parser::Parser;
 
 
 fn run() {

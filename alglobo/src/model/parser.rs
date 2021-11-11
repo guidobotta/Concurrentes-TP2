@@ -1,18 +1,11 @@
-use super::logger::Logger;
-use super::request::Request;
-use super::{env::Configuration, error::AppResult};
-use rand::Rng;
+use super::pago::Pago;
 use regex::Regex;
-use std::ops::Range;
-use std::{thread, time};
 
 /// Clase utilizada para parsear los distintos request recibidos mediante texto.
 #[derive(Debug)]
 pub struct Parser {
     reader: io::BufReader<File>,
-    matcher: Regex,
-    logger: Logger,
-    req_arrival_range: Range<usize>,
+    matcher: Regex
 }
 
 use std::{
@@ -23,64 +16,49 @@ use std::{
 impl Parser {
     /// Devuelve una instancia de Parser.
     /// Recibe el archivo del que debe leer los request y el logger donde debe notificar lo ejecutado.
-    pub fn open(
-        path: impl AsRef<std::path::Path>,
-        in_logger: Logger,
-        config: Configuration,
-    ) -> AppResult<Self> {
-        let file = File::open(path)?;
-
+    pub fn new(
+        path: impl AsRef<std::path::Path>
+    ) -> Parser {
+        let file = File::open(path).unwrap();
         let parser = Parser {
             reader: io::BufReader::new(file),
-            matcher: Regex::new(r"^([A-Z]{3}),([A-Z]{3}),([A-z]+),([PV])$")?,
-            logger: in_logger.clone(),
-            req_arrival_range: Range {
-                start: config.parser_min_req_arrival_time,
-                end: config.parser_max_req_arrival_time,
-            },
+            matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$").unwrap()
         };
 
-        in_logger.log_info(String::from(
-            "[Parser] CSV with requests successfully opened",
-        ));
-        Ok(parser)
+        //Ok(parser)
+        parser
     }
 
     /// Parsea el archivo de request.
     /// Metodo bloqueante, finaliza al terminar de procesar los requests.
-    pub fn parse_request(&mut self) -> AppResult<Option<Request>> {
+    pub fn parsear_pago(&mut self) -> Option<Pago> {
+        let mut buffer = String::new();
+        
         loop {
-            let mut buffer = vec![];
 
-            let bytes = self.reader.read_until(b'\n', &mut buffer)?;
+            let bytes = self.reader
+                            .read_line(&mut buffer).unwrap();
 
             if bytes == 0 {
-                return Ok(None);
+                return None;
             }
-
-            let buffer = String::from_utf8(buffer)?.replace("\n", "");
+            buffer = buffer.replace("\n", "");
 
             let cap = match self.matcher.captures(&buffer) {
-                None => {
-                    //Si no matchea se ignora el pedido
-                    self.logger.log_warning(String::from(
-                        "[Parser] Invalid line on Requests CSV, continuing anyway",
-                    ));
-                    continue;
-                }
+                None => continue,
                 Some(value) => value
             };
 
-            // Simulacion tiempo de arribo
-            let mut rng = rand::thread_rng();
-            let arrival_time = rng.gen_range(self.req_arrival_range.clone());
-            thread::sleep(time::Duration::from_millis(arrival_time as u64));
+            println!("[Parser] Nuevo pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
+                    &cap[1], &cap[2], &cap[3]);
 
-            self.logger.log_info(format!("[Parser] Request read from '{}' to '{}' flying with '{}' requesting hotel '{}' ",
-                    &cap[1], &cap[2], &cap[3], &cap[4]=="P"));
-
-            let request = Request::new(&cap[1], &cap[2], &cap[3], &cap[4] == "P")?;
-            return Ok(Some(request));
+            //Si pasa la regex sabemos el casteo no fallara. 
+            let request = Pago::new(
+                cap[1].parse::<usize>().unwrap(), 
+                cap[2].parse::<f64>().unwrap(), 
+                cap[3].parse::<f64>().unwrap());
+            
+            return Some(request);
         }
     }
 }
