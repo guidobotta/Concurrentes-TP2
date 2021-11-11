@@ -1,4 +1,4 @@
-use std::{io::{BufRead, BufReader, Write}, net::TcpListener};
+use std::{io::{BufRead, BufReader, Write}, net::{TcpListener, TcpStream}};
 use rand::Rng;
 use std::{thread, time};
 
@@ -12,26 +12,33 @@ fn simulate_work() -> Result<(), ()> {
 }
 
 
+fn procesar_conexion(mut stream: TcpStream) {
+    let mut numero = String::new();
+    loop {
+        let mut reader = BufReader::new( &stream);
+        let bytes = reader.read_line(&mut numero).unwrap();
+        if bytes == 0 { break };    //EOF detectado
+        let monto = numero.replace("\n", "").parse::<f64>().unwrap();
+        println!("Procesando monto: {}", monto);
+        let resultado = match simulate_work() {
+            Ok(_) => "OK\n",
+            Err(_) => "ERROR\n"
+        };
+        stream.write(resultado.as_bytes()).unwrap();
+    }
+}
+
 fn run() {
     let direccion = "localhost:6000".to_string();
     let listener = TcpListener::bind(direccion).unwrap();
     
     for stream in listener.incoming() {
-        let mut numero = String::new();
-        if let Ok(mut stream) = stream {
-            let mut reader = BufReader::new( &stream);
-            reader.read_line(&mut numero).unwrap();
-            let monto = numero.replace("\n", "").parse::<f64>().unwrap();
-            println!("Procesando monto: {}", monto);
-            let resultado = match simulate_work() {
-                Ok(_) => "OK",
-                Err(_) => "ERROR"
-            };
-            stream.write(resultado.as_bytes()).unwrap();
+        match stream {
+            Ok(stream) => procesar_conexion(stream),
+            Err(_) => break
         }
     }
 }
-
 
 fn main() {
    run()
