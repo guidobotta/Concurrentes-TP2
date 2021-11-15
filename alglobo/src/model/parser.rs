@@ -7,6 +7,7 @@ use regex::Regex;
 pub struct Parser {
     reader: io::BufReader<File>,
     matcher: Regex,
+    _posicion: usize,
 }
 
 use std::{
@@ -22,6 +23,7 @@ impl Parser {
         let parser = Parser {
             reader: io::BufReader::new(file),
             matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$")?,
+            _posicion: 0,
         };
 
         Ok(parser)
@@ -34,6 +36,8 @@ impl Parser {
 
         loop {
             let bytes = self.reader.read_line(&mut buffer)?;
+
+            self._posicion += 1;
 
             if bytes == 0 {
                 return Ok(None);
@@ -58,5 +62,9 @@ impl Parser {
 
             return Ok(Some(pago));
         }
+    }
+
+    pub fn posicion(&self) -> usize {
+        self._posicion
     }
 }

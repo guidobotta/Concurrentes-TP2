@@ -2,6 +2,8 @@ use regex::Error as RegexError;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IOError;
+use std::num::ParseIntError;
+use std::string::FromUtf8Error;
 
 /// Clase utilizada para manejar error internos del sistema
 
@@ -38,6 +40,8 @@ pub enum ErrorApp {
     Interno(ErrorInterno),
     ErrorIO(IOError),
     ErrorRegex(RegexError),
+    ErrorUtf8(FromUtf8Error),
+    ErrorParseoInt(ParseIntError),
 }
 
 // Tipo de resultado
@@ -64,20 +68,26 @@ impl From<RegexError> for ErrorApp {
     }
 }
 
+impl From<FromUtf8Error> for ErrorApp {
+    fn from(err: FromUtf8Error) -> ErrorApp {
+        ErrorApp::ErrorUtf8(err)
+    }
+}
+
+impl From<ParseIntError> for ErrorApp {
+    fn from(err: ParseIntError) -> ErrorApp {
+        ErrorApp::ErrorParseoInt(err)
+    }
+}
+
 impl Display for ErrorApp {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match *self {
             ErrorApp::Interno(ref inner) => inner.fmt(f),
             ErrorApp::ErrorIO(ref inner) => inner.fmt(f),
             ErrorApp::ErrorRegex(ref inner) => inner.fmt(f),
+            ErrorApp::ErrorUtf8(ref inner) => inner.fmt(f),
+            ErrorApp::ErrorParseoInt(ref inner) => inner.fmt(f),
         }
     }
 }
-
-//impl StdError for ErrorApp {
-//    fn description(&self) -> &str {
-//        match *self {
-//            ErrorApp::Interno(ref inner) => inner.description()
-//        }
-//    }
-//}

@@ -3,15 +3,17 @@ use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::mem::size_of;
 use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
-use std::sync::{Arc, Condvar, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 use std::convert::TryInto;
 
-fn id_to_ctrladdr(id: usize) -> String { "127.0.0.1:1234".to_owned() + &*id.to_string() }
+fn id_to_ctrladdr(id: usize) -> String {
+    "127.0.0.1:1234".to_owned() + &*id.to_string()
+}
 
 const TEAM_MEMBERS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -31,7 +33,7 @@ impl LeaderElection {
             socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
             leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
-            stop: Arc::new((Mutex::new(false), Condvar::new()))
+            stop: Arc::new((Mutex::new(false), Condvar::new())),
         };
 
         let mut clone = ret.clone();
@@ -41,37 +43,49 @@ impl LeaderElection {
         ret
     }
 
-    fn am_i_leader(&self) -> bool {
+    pub fn am_i_leader(&self) -> bool {
         self.get_leader_id() == self.id
     }
 
-    fn get_leader_id(&self) -> usize {
-        self.leader_id.1.wait_while(self.leader_id.0.lock().unwrap(), |leader_id| leader_id.is_none()).unwrap().unwrap()
+    pub fn get_leader_id(&self) -> usize {
+        self.leader_id
+            .1
+            .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
+                leader_id.is_none()
+            })
+            .unwrap()
+            .unwrap()
     }
 
-    fn find_new(&mut self) {
+    pub fn find_new(&mut self) {
         if *self.stop.0.lock().unwrap() {
-            return
+            return;
         }
         if self.leader_id.0.lock().unwrap().is_none() {
             // ya esta buscando lider
-            return
+            return;
         }
         println!("[{}] buscando lider", self.id);
         *self.got_ok.0.lock().unwrap() = false;
         *self.leader_id.0.lock().unwrap() = None;
         self.send_election();
-        let got_ok = self.got_ok.1.wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it );
+        let got_ok =
+            self.got_ok
+                .1
+                .wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
         if !*got_ok.unwrap().0 {
             self.make_me_leader()
         } else {
-            self.leader_id.1.wait_while(self.leader_id.0.lock().unwrap(), |leader_id| leader_id.is_none() );
+            self.leader_id
+                .1
+                .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
+                    leader_id.is_none()
+                });
         }
-
     }
 
-    fn id_to_msg(&self, header:u8) -> Vec<u8> {
-        let mut msg = vec!(header);
+    fn id_to_msg(&self, header: u8) -> Vec<u8> {
+        let mut msg = vec![header];
         msg.extend_from_slice(&self.id.to_le_bytes());
         msg
     }
@@ -79,7 +93,7 @@ impl LeaderElection {
     fn send_election(&self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
         let msg = self.id_to_msg(b'E');
-        for peer_id in (self.id+1)..TEAM_MEMBERS {
+        for peer_id in (self.id + 1)..TEAM_MEMBERS {
             self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
         }
     }
@@ -113,7 +127,9 @@ impl LeaderElection {
                 b'E' => {
                     println!("[{}] recibí Election de {}", self.id, id_from);
                     if id_from < self.id {
-                        self.socket.send_to(&self.id_to_msg(b'O'), id_to_ctrladdr(id_from)).unwrap();
+                        self.socket
+                            .send_to(&self.id_to_msg(b'O'), id_to_ctrladdr(id_from))
+                            .unwrap();
                         let mut me = self.clone();
                         thread::spawn(move || me.find_new());
                     }
@@ -134,7 +150,9 @@ impl LeaderElection {
 
     fn stop(&mut self) {
         *self.stop.0.lock().unwrap() = true;
-        self.stop.1.wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
+        self.stop
+            .1
+            .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
     }
 
     fn clone(&self) -> LeaderElection {
@@ -143,7 +161,7 @@ impl LeaderElection {
             socket: self.socket.try_clone().unwrap(),
             leader_id: self.leader_id.clone(),
             got_ok: self.got_ok.clone(),
-            stop: self.stop.clone()
+            stop: self.stop.clone(),
         }
     }
 }
