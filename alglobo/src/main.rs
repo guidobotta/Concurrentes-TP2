@@ -1,9 +1,12 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 mod model;
+use model::error::{Resultado};
 use model::parser::Parser;
 use model::leader_election::LeaderElection;
+use model::aplicacion::Aplicacion;
 
+//Esto se tiene que borrar de aca
 fn run() {
     let direccion = "localhost:6000".to_string();
     let mut resultado = String::new();
@@ -16,37 +19,43 @@ fn run() {
     println!("{}", resultado);
 }
 
-fn main() {
-    let id = std::env::args().nth(1).unwrap();
-    let lider = LeaderElection::new(id.parse::<usize>().unwrap());
-    //let aplicacion = Aplicacion::new(id, lider);
-    //aplicacion.comenzar();
+fn procesar(id: usize, path: String) -> Resultado<()> {
+
+    let parseador = Parser::new(path)?;
+    let lider = LeaderElection::new(id);
+    let aplicacion = Aplicacion::new(id, lider, parseador);
 
     let mut entrada = String::new();
     loop {
         let _ = std::io::stdin().read_line(&mut entrada);
         if entrada.contains("SALIR"){
-            //aplicacion.finalizar();
+            aplicacion.finalizar();
             break; 
         }
     }
+    Ok(())
 }
 
-//Se levanta una instancia
-//Eleccion de lider
+fn main() {
 
-//Loop
-    //Si es lider:
-        //Si conexion no establecida:
-            //Conectar con webservices y las replicas
-        //Leer una linea del archivo
-        //Procesar pago (enviar a los webservices)
-            //Si falla agregar a lista de falladas
-        //Actualizar replicas   -> 
-            //1. Enviar a cada replica por UDP un mensaje de "Estoy parado en esta linea"
-            //2. Quedarse esperando por la respuesta de cada una (timeout). Si no hay respuesta, se reenvian todos.
+    let path = match std::env::args().nth(1) {
+        Some(path) => path,
+        None => { 
+            println!("Se debe indicar un path a un archivo de entrada");
+            return
+        } 
+    };
 
-    //Si no es el lider:
-        //Recibir actualizacion del archivo (TIMEOUT)
-        //Solicitar nuevo lider si salta timeout
+    let id = match std::env::args().nth(2).and_then(|a| a.parse::<usize>().ok()) {
+        Some(r) => r,
+        None => {
+            println!("Se debe indicar un id numerico para el nodo");
+            return
+        }
+    };
+
+    if let Err(err) = procesar(id, path) {
+        println!("{}", err)
+    }
+}
 
