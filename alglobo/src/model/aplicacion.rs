@@ -61,7 +61,7 @@ impl Aplicacion {
                     //Agregar a la lista de falladas
                 }
 
-                Aplicacion::actualizar_replicas(&mut protocolo, parseador.posicion());
+                //Aplicacion::actualizar_replicas(&mut protocolo, parseador.posicion());
             } else {
                 //Recibir actualizacion del archivo (TIMEOUT)
                 //Si la actualizacion es nueva (la linea es mayor a la que tengo en mi estado):
@@ -129,3 +129,8 @@ impl Aplicacion {
         "127.0.0.1:400".to_owned() + &*id.to_string() //Mejorar
     }
 }
+
+
+//Nuestra aplicacion levanta un archivo de pagos y lo lee secuencialmente.
+//Para reintentar los pagos no finalizados, podemos almacenarlos en un archivo y reintentarlos secuencialmente?
+//Instanciamos la aplicacion con el nuevo path

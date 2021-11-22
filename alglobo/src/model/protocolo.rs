@@ -4,9 +4,13 @@ use std::net::{SocketAddr, UdpSocket};
 
 static TAM_BUFFER: usize = 128;
 
+#[derive(Clone)]
 pub enum Mensaje {
     OK { linea: usize },
     ACT { linea: usize },
+    PREPARE { id: usize, monto: f64 },
+    COMMIT { id: usize },
+    ABORT { id: usize }
 }
 
 impl Mensaje {
@@ -14,6 +18,10 @@ impl Mensaje {
         match &self {
             Mensaje::OK { linea } => format!("OK {}", linea),
             Mensaje::ACT { linea } => format!("ACT {}", linea),
+            Mensaje::PREPARE { id, monto } => format!("PREPARE {} {}", id, monto),
+            Mensaje::COMMIT { id, monto } => format!("COMMIT {} {}", id, monto),
+            Mensaje::ABORT { id} => format!("ABORT {}", id),
+
         }
     }
 
@@ -26,6 +34,17 @@ impl Mensaje {
             }),
             "OK" => Ok(Mensaje::OK {
                 linea: parseado[1].parse::<usize>()?,
+            }),
+            "PREPARE" => Ok(Mensaje::PREPARE {
+                id: parseado[1].parse::<usize>()?,
+                monto: parseado[1].parse::<f64>()?
+            }),
+            "COMMIT" => Ok(Mensaje::COMMIT {
+                id: parseado[1].parse::<usize>()?,
+                monto: parseado[1].parse::<f64>()?
+            }),
+            "ABORT" => Ok(Mensaje::ABORT {
+                id: parseado[1].parse::<usize>()?
             }),
             _ => Err(ErrorApp::Interno(ErrorInterno::new("Mensaje erroneo"))),
         }

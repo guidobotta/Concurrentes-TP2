@@ -10,6 +10,7 @@ fn procesar(id: usize, path: String) -> Resultado<()> {
     let aplicacion = Aplicacion::new(id, lider, parseador)?;
 
     let mut entrada = String::new();
+    //Loopea infinitamente si la app finaliza
     loop {
         let _ = std::io::stdin().read_line(&mut entrada);
         if entrada.contains("SALIR") {

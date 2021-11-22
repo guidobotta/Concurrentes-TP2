@@ -41,7 +41,7 @@ pub enum ErrorApp {
     ErrorIO(IOError),
     ErrorRegex(RegexError),
     ErrorUtf8(FromUtf8Error),
-    ErrorParseoInt(ParseIntError),
+    ErrorParseoInt(ParseIntError)
 }
 
 // Tipo de resultado

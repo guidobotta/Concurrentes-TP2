@@ -4,3 +4,4 @@ pub mod leader_election;
 pub mod pago;
 pub mod parser;
 pub mod protocolo;
+pub mod twophase_coordinator;
