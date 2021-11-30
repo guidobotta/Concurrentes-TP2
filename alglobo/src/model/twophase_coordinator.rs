@@ -1,20 +1,12 @@
-use std::any::Any;
-use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader, Write};
-use std::mem::size_of;
-use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
+use std::collections::{HashMap};
 use std::sync::{Arc, Condvar, Mutex};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{thread, io};
+use std::{thread};
 use std::time::Duration;
 use super::error::{ErrorApp, ErrorInterno, Resultado};
 use super::protocolo::Protocolo;
-use super::pago::{self, Pago};
+use super::pago::{Pago};
 
-use rand::{Rng, thread_rng};
-use std::convert::TryInto;
-use crate::TransactionState::{Wait, Commit};
-use crate::model::protocolo::Mensaje;
+use crate::model::protocolo::{Mensaje, CodigoMensaje};
 
 fn id_to_addr(id: usize) -> String { "127.0.0.1:1234".to_owned() + &*id.to_string() }
 
@@ -36,89 +28,103 @@ struct TransactionCoordinator {
     log: HashMap<usize, TransactionState>,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
+    id: usize,
+    destinatarios: Vec<String>
 }
 
+fn direccion_desde_id(id: &usize) -> String {
+    format!("127.0.0.1:500{}", *id) // TODO: Mejorar
+}
 
 impl TransactionCoordinator {
-    fn new() -> Self {
+    fn new(id: usize) -> Self {
         let mut ret = TransactionCoordinator {
             log: HashMap::new(),
             protocolo: Protocolo::new(TRANSACTION_COORDINATOR_ADDR.to_string()).unwrap(),
             responses: Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new())),
+            id,
+            destinatarios: vec![0, 1, 2].iter().map(direccion_desde_id).collect() // TODO: cambiar esto
         };
 
-        let mut clone = ret.clone();
-        thread::spawn(move || clone.responder());
+        thread::spawn(move || TransactionCoordinator::responder(ret.protocolo, ret.responses));
 
         ret
     }
 
-    fn submit(&mut self, pago: Pago) -> bool {
+    fn submit(&mut self, pago: Pago) {
         match self.log.get(&pago.get_id()) {
-            None => self.full_protocol(&pago, false),
-            Some(TransactionState::Wait) => self.full_protocol(&pago, true),
-            Some(TransactionState::Commit) => self.commit(&pago),
-            Some(TransactionState::Abort) => self.abort(&pago)
+            None => self.full_protocol(&pago),
+            Some(TransactionState::Wait) => self.full_protocol(&pago),
+            Some(TransactionState::Commit) => { self.commit(&pago); },
+            Some(TransactionState::Abort) => { self.abort(&pago); }
         }
     }
 
-    fn full_protocol(&mut self, pago: &Pago, force_continue: bool) -> bool {
-        if self.prepare(pago) {
-            self.commit(pago)
-        } else {
-            self.abort(pago)
+    fn full_protocol(&mut self, pago: &Pago) {
+        match self.prepare(pago) {
+            Ok(_) => { self.commit(pago); }, // TODO: ver que hacer con el result de estos
+            Err(_) => { self.abort(pago); } // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
         }
     }
 
-    fn prepare(&mut self, pago: &Pago) -> bool {
-        self.log.insert(t, TransactionState::Wait);
+    fn prepare(&mut self, pago: &Pago) -> Resultado<()> {
+        self.log.insert(pago.get_id(), TransactionState::Wait);
         println!("[COORDINATOR] prepare {}", pago.get_id());
-        let m_hotel = Mensaje::PREPARE {id: pago.get_id(), monto: pago.get_monto_hotel()};
-        let m_aerolinea = Mensaje::PREPARE {id: pago.get_id(), monto: pago.get_monto_aerolinea()};
-        let m_banco = Mensaje::PREPARE {id: pago.get_id(), monto: pago.get_monto_hotel() + pago.get_monto_aerolinea()}; // TODO: PASAR ESTO AL PARSER 
 
-        let esperado = Mensaje::COMMIT { id: pago.get_id() };
-        
-        
-        self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], destinatarios, retries, esperado);
+        let id_op = pago.get_id();
 
-        true
+        // Preparo los mensajes a enviar
+        let m_hotel = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_hotel()}, self.id, id_op);
+        let m_aerolinea = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_aerolinea()}, self.id, id_op);
+        let m_banco = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_hotel() + pago.get_monto_aerolinea()}, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
+
+        // Mensaje esperado
+        let esperado = Mensaje::new(CodigoMensaje::READY, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
+        
+        self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
     }
 
-    fn commit(&mut self, pago: &Pago) -> bool {
-        self.log.insert(t, TransactionState::Commit);
-        println!("[COORDINATOR] commit {}", t.0);
-        self.broadcast_and_wait(b'C', t, TransactionState::Commit)
+    fn commit(&mut self, pago: &Pago) -> Resultado<()> {
+        self.log.insert(pago.get_id(), TransactionState::Commit);
+        println!("[COORDINATOR] commit {}", pago.get_id());
+
+        let id_op = pago.get_id();
+
+        // Preparo los mensajes a enviar y mensaje esperado
+        let mensaje = Mensaje::new(CodigoMensaje::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
+
+        self.send_and_wait(vec![mensaje, mensaje, mensaje], mensaje)
     }
 
-    fn abort(&mut self, pago: &Pago) -> bool {
-        self.log.insert(t, TransactionState::Abort);
-        println!("[COORDINATOR] abort {}", t.0);
-        !self.broadcast_and_wait(b'A', t, TransactionState::Abort)
+    fn abort(&mut self, pago: &Pago) -> Resultado<()> {
+        self.log.insert(pago.get_id(), TransactionState::Abort);
+        println!("[COORDINATOR] abort {}", pago.get_id());
+
+        let id_op = pago.get_id();
+
+        // Preparo los mensajes a enviar y mensaje esperado
+        let mensaje = Mensaje::new(CodigoMensaje::ABORT, self.id, id_op);
+
+        self.send_and_wait(vec![mensaje, mensaje, mensaje], mensaje)
     }
 
     //Queremos que se encargue de enviarle los mensajes a los destinatarios
     //y espere por sus respuestas, con un timeout y numero de intentos dado
     fn send_and_wait(&self, 
                      mensajes: Vec<Mensaje>, 
-                     destinatarios: Vec<String>,
-                     retries: Option<usize>,
                      esperado: Mensaje) -> Resultado<()> {
 
         let mut responses;
+        *self.responses.0.lock().unwrap() = vec![None; STAKEHOLDERS];
 
         loop {
             for (idx, mensaje) in mensajes.iter().enumerate() {
-                self.protocolo.enviar(&mensaje, destinatarios[idx]).unwrap();
+                self.protocolo.enviar(&mensaje, self.destinatarios[idx]).unwrap();
             }
             responses = self.responses.1.wait_timeout_while(self.responses.0.lock().unwrap(), TIMEOUT, |responses| responses.iter().any(Option::is_none));
 
             if responses.is_ok() { break; }
-
-            if let Some(ref mut val) = retries {
-                *val -= 1;
-                if *val <= 0 { break; }
-            }
+            println!("[COORDINATOR] timeout {}", esperado.id_op);
         }
 
         if !responses.unwrap().0.iter().all(|opt| opt.is_some() && opt.unwrap() == esperado) {
@@ -128,53 +134,26 @@ impl TransactionCoordinator {
         Ok(())
     }
 
-
-    fn broadcast_and_wait(&self, message: u8, t: TransactionId, expected: TransactionState) -> bool {
-        *self.responses.0.lock().unwrap() = vec![None; STAKEHOLDERS];
-        let mut msg = vec!(message);
-        msg.extend_from_slice(&t.0.to_le_bytes());
-        for stakeholder in 0..STAKEHOLDERS {
-            println!("[COORDINATOR] envio {} id {} a {}", message, t.0, stakeholder);
-            self.socket.send_to(&msg, id_to_addr(stakeholder)).unwrap();
-        }
-        let responses = self.responses.1.wait_timeout_while(self.responses.0.lock().unwrap(), TIMEOUT, |responses| responses.iter().any(Option::is_none));
-        if responses.is_err() {
-            println!("[COORDINATOR] timeout {}", t.0);
-            false
-        } else {
-            responses.unwrap().0.iter().all(|opt| opt.is_some() && opt.unwrap() == expected)
-        }
-    }
-
-    fn responder(&mut self) {
+    fn responder(protocolo: Protocolo, responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>) {
         loop {
-            let mut buf = [0; size_of::<usize>() + 1];
-            let (size, from) = self.socket.recv_from(&mut buf).unwrap();
-            let id_from = usize::from_le_bytes(buf[1..].try_into().unwrap());
+            let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
+            let id_emisor = mensaje.id_emisor;
 
-            match &buf[0] {
-                b'C' => {
-                    println!("[COORDINATOR] recibí COMMIT de {}", id_from);
-                    self.responses.0.lock().unwrap()[id_from] = Some(TransactionState::Commit);
-                    self.responses.1.notify_all();
+            match mensaje.codigo {
+                CodigoMensaje::READY => {
+                    println!("[COORDINATOR] recibí COMMIT de {}", id_emisor);
+                    responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
+                    responses.1.notify_all();
                 }
-                b'A' => {
-                    println!("[COORDINATOR] recibí ABORT de {}", id_from);
-                    self.responses.0.lock().unwrap()[id_from] = Some(TransactionState::Abort);
-                    self.responses.1.notify_all();
+                CodigoMensaje::ABORT => {
+                    println!("[COORDINATOR] recibí ABORT de {}", id_emisor);
+                    responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
+                    responses.1.notify_all();
                 }
                 _ => {
-                    println!("[COORDINATOR] ??? {}", id_from);
+                    println!("[COORDINATOR] recibí algo que no puedo interpretar {}", id_emisor);
                 }
             }
-        }
-    }
-
-    fn clone(&self) -> Self {
-        TransactionCoordinator {
-            log: HashMap::new(),
-            socket: self.socket.try_clone().unwrap(),
-            responses: self.responses.clone(),
         }
     }
 }
