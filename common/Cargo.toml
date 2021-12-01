@@ -1,5 +1,5 @@
 [package]
-name = "alglobo"
+name = "common"
 version = "0.1.0"
 edition = "2018"
 
@@ -7,5 +7,3 @@ edition = "2018"
 
 [dependencies]
 regex = "1"
-rand = "0.8.4"
-common = { path = "../common" }

@@ -1,9 +1,4 @@
 use super::error::{ErrorApp, ErrorInterno, Resultado};
-use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, UdpSocket};
-use std::time::Duration;
-
-static TAM_BUFFER: usize = 128;
 
 #[derive(Clone, PartialEq)]
 pub enum CodigoMensaje {
@@ -52,40 +47,5 @@ impl Mensaje {
 impl PartialEq for Mensaje {
     fn eq(&self, otro: &Self) -> bool {
         self.codigo == otro.codigo && self.id_op == self.id_op
-    }
-}
-
-pub struct Protocolo {
-    skt: UdpSocket,
-}
-
-impl Protocolo {
-    pub fn new(direccion: String) -> Resultado<Protocolo> {
-        Ok(Protocolo {
-            skt: UdpSocket::bind(direccion)?,
-        })
-    }
-
-    pub fn enviar(&mut self, mensaje: &Mensaje, direccion: String) -> Resultado<()> {
-        let mensaje = mensaje.codificar();
-        self.skt.send_to(mensaje.as_bytes(), direccion)?;
-        Ok(())
-    }
-
-    pub fn recibir(&mut self, timeout: Option<Duration>) -> Resultado<Mensaje> {
-        let mut buffer = Vec::with_capacity(TAM_BUFFER);
-        self.skt.set_read_timeout(timeout);
-        let (recibido, _) = self.skt.recv_from(&mut buffer)?;
-        if recibido == 0 {
-            return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
-        }
-
-        Mensaje::decodificar(&String::from_utf8(buffer)?)
-    }
-
-    fn clone(&self) -> Self {
-        Protocolo {
-            skt: self.skt.try_clone().unwrap(),
-        }
     }
 }

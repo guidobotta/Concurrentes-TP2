@@ -1,6 +1,6 @@
 mod model;
 use model::aplicacion::Aplicacion;
-use model::error::Resultado;
+use common::error::Resultado;
 use model::leader_election::LeaderElection;
 use model::parser::Parser;
 

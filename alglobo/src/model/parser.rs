@@ -1,4 +1,4 @@
-use super::error::Resultado;
+use common::error::Resultado;
 use super::pago::Pago;
 use regex::Regex;
 

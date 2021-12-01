@@ -4,11 +4,11 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
-use super::error::{ErrorApp, Resultado};
+use common::error::Resultado;
 use super::leader_election::LeaderElection;
 use super::pago::Pago;
 use super::parser::Parser;
-use super::protocolo::{Mensaje, Protocolo};
+use common::protocolo::Protocolo;
 
 static NUMERO_REPLICAS: usize = 10;
 static TIMEOUT: usize = 3000; //Milis

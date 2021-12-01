@@ -2,11 +2,10 @@ use std::collections::{HashMap};
 use std::sync::{Arc, Condvar, Mutex};
 use std::{thread};
 use std::time::Duration;
-use super::error::{ErrorApp, ErrorInterno, Resultado};
-use super::protocolo::Protocolo;
-use super::pago::{Pago};
-
-use crate::model::protocolo::{Mensaje, CodigoMensaje};
+use common::error::{ErrorApp, ErrorInterno, Resultado};
+use common::protocolo::Protocolo;
+use super::pago::Pago;
+use common::mensaje::{Mensaje, CodigoMensaje};
 
 fn id_to_addr(id: usize) -> String { "127.0.0.1:1234".to_owned() + &*id.to_string() }
 
@@ -18,14 +17,14 @@ const TRANSACTION_COORDINATOR_ADDR: &str = "127.0.0.1:1234";
 struct TransactionId(u32);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum TransactionState {
+enum EstadoTransaccion {
     Wait,
     Commit,
     Abort,
 }
 
-struct TransactionCoordinator {
-    log: HashMap<usize, TransactionState>,
+struct CoordinadorTransaccion {
+    log: HashMap<usize, EstadoTransaccion>,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
@@ -36,9 +35,9 @@ fn direccion_desde_id(id: &usize) -> String {
     format!("127.0.0.1:500{}", *id) // TODO: Mejorar
 }
 
-impl TransactionCoordinator {
+impl CoordinadorTransaccion {
     fn new(id: usize) -> Self {
-        let mut ret = TransactionCoordinator {
+        let mut ret = CoordinadorTransaccion {
             log: HashMap::new(),
             protocolo: Protocolo::new(TRANSACTION_COORDINATOR_ADDR.to_string()).unwrap(),
             responses: Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new())),
@@ -46,7 +45,7 @@ impl TransactionCoordinator {
             destinatarios: vec![0, 1, 2].iter().map(direccion_desde_id).collect() // TODO: cambiar esto
         };
 
-        thread::spawn(move || TransactionCoordinator::responder(ret.protocolo, ret.responses));
+        thread::spawn(move || CoordinadorTransaccion::responder(ret.protocolo, ret.responses));
 
         ret
     }
@@ -54,21 +53,21 @@ impl TransactionCoordinator {
     fn submit(&mut self, pago: Pago) {
         match self.log.get(&pago.get_id()) {
             None => self.full_protocol(&pago),
-            Some(TransactionState::Wait) => self.full_protocol(&pago),
-            Some(TransactionState::Commit) => { self.commit(&pago); },
-            Some(TransactionState::Abort) => { self.abort(&pago); }
+            Some(EstadoTransaccion::Wait) => self.full_protocol(&pago),
+            Some(EstadoTransaccion::Commit) => { self.commit(&pago); },
+            Some(EstadoTransaccion::Abort) => { self.abort(&pago); }
         }
     }
 
     fn full_protocol(&mut self, pago: &Pago) {
         match self.prepare(pago) {
-            Ok(_) => { self.commit(pago); }, // TODO: ver que hacer con el result de estos
+            Ok(_) => { self.commit(pago); }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
             Err(_) => { self.abort(pago); } // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
         }
     }
 
     fn prepare(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), TransactionState::Wait);
+        self.log.insert(pago.get_id(), EstadoTransaccion::Wait);
         println!("[COORDINATOR] prepare {}", pago.get_id());
 
         let id_op = pago.get_id();
@@ -85,7 +84,7 @@ impl TransactionCoordinator {
     }
 
     fn commit(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), TransactionState::Commit);
+        self.log.insert(pago.get_id(), EstadoTransaccion::Commit);
         println!("[COORDINATOR] commit {}", pago.get_id());
 
         let id_op = pago.get_id();
@@ -97,7 +96,7 @@ impl TransactionCoordinator {
     }
 
     fn abort(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), TransactionState::Abort);
+        self.log.insert(pago.get_id(), EstadoTransaccion::Abort);
         println!("[COORDINATOR] abort {}", pago.get_id());
 
         let id_op = pago.get_id();
