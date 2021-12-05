@@ -25,7 +25,9 @@ impl Protocolo {
     pub fn recibir(&mut self, timeout: Option<Duration>) -> Resultado<Mensaje> {
         let mut buffer = Vec::with_capacity(TAM_BUFFER);
         self.skt.set_read_timeout(timeout); // TODO: manejar resultado
-        let (recibido, _) = self.skt.recv_from(&mut buffer)?;
+        println!("SARASAAA");
+        let (recibido, src) = self.skt.recv_from(&mut buffer)?;
+        println!("Recibido: {}, SRC: {}", recibido, src);
         if recibido == 0 {
             return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
         }
@@ -33,7 +35,7 @@ impl Protocolo {
         Mensaje::decodificar(&String::from_utf8(buffer)?)
     }
 
-    fn clone(&self) -> Self {
+    pub fn clone(&self) -> Self {
         Protocolo {
             skt: self.skt.try_clone().unwrap(),
         }

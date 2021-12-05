@@ -21,7 +21,7 @@ impl WebService {
     pub fn new(id: usize) -> Self {
         WebService {
             log: HashMap::new(),
-            protocolo: Protocolo::new("127.0.0.1:1234".to_owned() + &*id.to_string()).unwrap(),
+            protocolo: Protocolo::new(DNS::direccion_webservice(&id)).unwrap(),
             id
         }
     }
