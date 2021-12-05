@@ -15,6 +15,12 @@ pub struct Mensaje {
     pub id_op: usize
 }
 
+use std::any::type_name;
+
+fn type_of<T>(_: T) -> &'static str {
+    type_name::<T>()
+}
+
 impl Mensaje {
     pub fn new(codigo: CodigoMensaje, id_emisor: usize, id_op: usize) -> Self { Self { codigo, id_emisor, id_op } }
 
@@ -29,12 +35,12 @@ impl Mensaje {
 
     pub fn decodificar(mensaje_codificado: &String) -> Resultado<Mensaje> {
         let parseado = mensaje_codificado.split(' ').collect::<Vec<&str>>();
-
         let codigo = match parseado[0] {
-            "PREPARE" => CodigoMensaje::PREPARE { monto: parseado[3].parse::<f64>()? },
+            "PREPARE" => CodigoMensaje::PREPARE { monto: parseado[3].parse::<f64>().unwrap() },
             "COMMIT" => CodigoMensaje::COMMIT,
             "ABORT" => CodigoMensaje::ABORT,
-            _ => return Err(ErrorApp::Interno(ErrorInterno::new("Mensaje erroneo"))),
+            "READY" => CodigoMensaje::READY,
+            _ => return Err(ErrorApp::Interno(ErrorInterno::new(&format!("Mensaje erroneo: {}", parseado[0])))),
         };
 
         Ok(Mensaje::new(codigo, 

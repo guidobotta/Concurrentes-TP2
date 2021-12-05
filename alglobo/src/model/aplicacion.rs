@@ -5,7 +5,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::leader_election::LeaderElection;
+use super::{leader_election::LeaderElection, escritor_fallidos::EscritorFallidos};
 use super::pago::Pago;
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
@@ -19,13 +19,17 @@ pub struct Aplicacion {
 }
 
 impl Aplicacion {
-    pub fn new(id: usize, lider: LeaderElection, parseador: Parser) -> Resultado<Aplicacion> {
+    pub fn new(
+        id: usize, 
+        lider: LeaderElection, 
+        parseador: Parser,
+        escritor: EscritorFallidos) -> Resultado<Aplicacion> {
         //let protocolo = Protocolo::new(Aplicacion::direccion_desde_id(id))?;
         let continuar = Arc::new(AtomicBool::new(true));
         let continuar_clonado = continuar.clone();
         Ok(Aplicacion {
             handle: thread::spawn(move || {
-                Aplicacion::procesar(id, lider, parseador, continuar_clonado)
+                Aplicacion::procesar(id, lider, parseador, escritor, continuar_clonado)
             }),
             continuar,
         })
@@ -40,10 +44,10 @@ impl Aplicacion {
         id: usize,
         lider: LeaderElection,
         mut parseador: Parser,
+        mut escritor: EscritorFallidos,
         continuar: Arc<AtomicBool>,
     ) {
         let mut coordinador = CoordinadorTransaccion::new(id);
-
         while continuar.load(Ordering::Relaxed) {
             if lider.am_i_leader() {
                 //if !conexion_establecida {
@@ -57,12 +61,12 @@ impl Aplicacion {
                 };
 
                 //Procesar pago
-                coordinador.submit(pago);
-
-                //if Aplicacion::procesar_pago(&pago).is_err() {
-                //    //Agregar a la lista de falladas
-                //    println!("El pago de id {} ha fallado", pago.get_id());
-                //}
+                let id_pago = pago.get_id();
+                if coordinador.submit(pago.clone()).is_err() {
+                    //Agregar a la lista de falladas
+                    println!("El pago de id {} ha fallado", id_pago);
+                    escritor.escribir_fallido(pago);
+                }
 
                 //Aplicacion::actualizar_replicas(&mut protocolo, parseador.posicion());
             } else {

@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Pago {
     id: usize,
     monto_aerolinea: f64,

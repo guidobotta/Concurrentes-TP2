@@ -3,7 +3,7 @@ use std::net::UdpSocket;
 use std::time::Duration;
 use super::mensaje::Mensaje;
 
-static TAM_BUFFER: usize = 128;
+static TAM_BUFFER: usize = 256;
 
 pub struct Protocolo {
     skt: UdpSocket,
@@ -23,16 +23,14 @@ impl Protocolo {
     }
 
     pub fn recibir(&mut self, timeout: Option<Duration>) -> Resultado<Mensaje> {
-        let mut buffer = Vec::with_capacity(TAM_BUFFER);
+        let mut buffer = vec![0; TAM_BUFFER];
         self.skt.set_read_timeout(timeout); // TODO: manejar resultado
-        println!("SARASAAA");
         let (recibido, src) = self.skt.recv_from(&mut buffer)?;
-        println!("Recibido: {}, SRC: {}", recibido, src);
+
         if recibido == 0 {
             return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
         }
-
-        Mensaje::decodificar(&String::from_utf8(buffer)?)
+        Mensaje::decodificar(&String::from_utf8(buffer[..recibido].to_vec()).unwrap())
     }
 
     pub fn clone(&self) -> Self {

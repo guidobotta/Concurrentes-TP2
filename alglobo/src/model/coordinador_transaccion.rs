@@ -29,10 +29,6 @@ pub struct CoordinadorTransaccion {
     destinatarios: Vec<String>
 }
 
-fn direccion_desde_id(id: &usize) -> String {
-    format!("127.0.0.1:500{}", *id) // TODO: Mejorar
-}
-
 impl CoordinadorTransaccion {
     pub fn new(id: usize) -> Self {
 
@@ -43,7 +39,7 @@ impl CoordinadorTransaccion {
             protocolo: protocolo.clone(),
             responses: responses.clone(),
             id,
-            destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_alglobo(&id)).collect() // TODO: cambiar esto
+            destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_webservice(&id)).collect() // TODO: cambiar esto
         };
 
         thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses));
@@ -51,19 +47,25 @@ impl CoordinadorTransaccion {
         ret
     }
 
-    pub fn submit(&mut self, pago: Pago) {
+    pub fn submit(&mut self, pago: Pago) -> Resultado<()>{
         match self.log.get(&pago.get_id()) {
             None => self.full_protocol(&pago),
             Some(EstadoTransaccion::Wait) => self.full_protocol(&pago),
-            Some(EstadoTransaccion::Commit) => { self.commit(&pago); },
-            Some(EstadoTransaccion::Abort) => { self.abort(&pago); }
+            Some(EstadoTransaccion::Commit) => { self.commit(&pago) },
+            Some(EstadoTransaccion::Abort) => { 
+                let _ = self.abort(&pago);
+                return Err(ErrorApp::Interno(ErrorInterno::new("Pago abortado")));
+            }
         }
     }
 
-    fn full_protocol(&mut self, pago: &Pago) {
+    fn full_protocol(&mut self, pago: &Pago) -> Resultado<()> {
         match self.prepare(pago) {
-            Ok(_) => { self.commit(pago); }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
-            Err(_) => { self.abort(pago); } // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
+            Ok(_) => { self.commit(pago) }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
+            Err(e) => { 
+                let _ = self.abort(pago); // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
+                Err(e)
+             } 
         }
     }
 
@@ -139,8 +141,13 @@ impl CoordinadorTransaccion {
             let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
             let id_emisor = mensaje.id_emisor;
 
-            match mensaje.codigo {
+            match mensaje.codigo {        
                 CodigoMensaje::READY => {
+                    println!("[COORDINATOR] recibí READY de {}", id_emisor);
+                    responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
+                    responses.1.notify_all();
+                }
+                CodigoMensaje::COMMIT => {
                     println!("[COORDINATOR] recibí COMMIT de {}", id_emisor);
                     responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
                     responses.1.notify_all();
