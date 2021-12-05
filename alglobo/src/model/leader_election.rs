@@ -7,12 +7,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
+use common::dns::DNS;
 
 use rand::{thread_rng, Rng};
 use std::convert::TryInto;
 
 fn id_to_ctrladdr(id: usize) -> String {
-    "127.0.0.1:1234".to_owned() + &*id.to_string()
+    DNS::direccion_lider(&id)
 }
 
 const TEAM_MEMBERS: usize = 5;

@@ -8,7 +8,7 @@ use common::error::Resultado;
 use super::leader_election::LeaderElection;
 use super::pago::Pago;
 use super::parser::Parser;
-use common::protocolo::Protocolo;
+use super::coordinador_transaccion::CoordinadorTransaccion;
 
 static NUMERO_REPLICAS: usize = 10;
 static TIMEOUT: usize = 3000; //Milis
@@ -20,12 +20,12 @@ pub struct Aplicacion {
 
 impl Aplicacion {
     pub fn new(id: usize, lider: LeaderElection, parseador: Parser) -> Resultado<Aplicacion> {
-        let protocolo = Protocolo::new(Aplicacion::direccion_desde_id(id))?;
+        //let protocolo = Protocolo::new(Aplicacion::direccion_desde_id(id))?;
         let continuar = Arc::new(AtomicBool::new(true));
         let continuar_clonado = continuar.clone();
         Ok(Aplicacion {
             handle: thread::spawn(move || {
-                Aplicacion::procesar(id, lider, parseador, protocolo, continuar_clonado)
+                Aplicacion::procesar(id, lider, parseador, continuar_clonado)
             }),
             continuar,
         })
@@ -40,26 +40,29 @@ impl Aplicacion {
         id: usize,
         lider: LeaderElection,
         mut parseador: Parser,
-        mut protocolo: Protocolo,
         continuar: Arc<AtomicBool>,
     ) {
-        let conexion_establecida = false;
+        let mut coordinador = CoordinadorTransaccion::new(id);
 
         while continuar.load(Ordering::Relaxed) {
             if lider.am_i_leader() {
-                if !conexion_establecida {
-                    //Conectar con webservices
-                    Aplicacion::sincronizar();
-                }
+                //if !conexion_establecida {
+                //    //Conectar con webservices
+                //    Aplicacion::sincronizar();
+                //}
 
                 let pago = match parseador.parsear_pago().ok() {
                     Some(Some(r)) => r,
                     _ => break,
                 };
 
-                if Aplicacion::procesar_pago(&pago).is_err() {
-                    //Agregar a la lista de falladas
-                }
+                //Procesar pago
+                coordinador.submit(pago);
+
+                //if Aplicacion::procesar_pago(&pago).is_err() {
+                //    //Agregar a la lista de falladas
+                //    println!("El pago de id {} ha fallado", pago.get_id());
+                //}
 
                 //Aplicacion::actualizar_replicas(&mut protocolo, parseador.posicion());
             } else {
@@ -99,34 +102,8 @@ impl Aplicacion {
 
     fn procesar_pago(_pago: &Pago) -> Resultado<()> {
         //Procesar transaccionalidad a los webservices
+        
         Ok(())
-    }
-
-    fn actualizar_replicas(protocolo: &mut Protocolo, linea: usize) {
-        //1. Enviar a cada replica por UDP un mensaje de "Estoy parado en esta linea"
-        //2. Quedarse esperando por la respuesta de al menos uno
-
-        let mensaje = Mensaje::ACT { linea };
-        let mut ok_recibido = false;
-
-        while !ok_recibido {
-            (0..NUMERO_REPLICAS).for_each(|id_replica| {
-                let _ = protocolo.enviar(&mensaje, Aplicacion::direccion_desde_id(id_replica));
-            });
-            let mut timeout = false;
-
-            while !ok_recibido && !timeout {
-                match protocolo.recibir(TIMEOUT) {
-                    Ok(Mensaje::OK { linea: l }) if l == linea => ok_recibido = true,
-                    Err(_) => timeout = true,
-                    _ => continue,
-                }
-            }
-        }
-    }
-
-    fn direccion_desde_id(id: usize) -> String {
-        "127.0.0.1:400".to_owned() + &*id.to_string() //Mejorar
     }
 }
 

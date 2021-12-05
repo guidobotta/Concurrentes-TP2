@@ -6,12 +6,10 @@ use common::error::{ErrorApp, ErrorInterno, Resultado};
 use common::protocolo::Protocolo;
 use super::pago::Pago;
 use common::mensaje::{Mensaje, CodigoMensaje};
-
-fn id_to_addr(id: usize) -> String { "127.0.0.1:1234".to_owned() + &*id.to_string() }
+use common::dns::DNS;
 
 const STAKEHOLDERS: usize = 3;
 const TIMEOUT: Duration = Duration::from_secs(10);
-const TRANSACTION_COORDINATOR_ADDR: &str = "127.0.0.1:1234";
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TransactionId(u32);
@@ -23,7 +21,7 @@ enum EstadoTransaccion {
     Abort,
 }
 
-struct CoordinadorTransaccion {
+pub struct CoordinadorTransaccion {
     log: HashMap<usize, EstadoTransaccion>,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
@@ -36,21 +34,24 @@ fn direccion_desde_id(id: &usize) -> String {
 }
 
 impl CoordinadorTransaccion {
-    fn new(id: usize) -> Self {
-        let mut ret = CoordinadorTransaccion {
+    pub fn new(id: usize) -> Self {
+
+        let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
+        let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
+        let ret = CoordinadorTransaccion {
             log: HashMap::new(),
-            protocolo: Protocolo::new(TRANSACTION_COORDINATOR_ADDR.to_string()).unwrap(),
-            responses: Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new())),
+            protocolo: protocolo.clone(),
+            responses: responses.clone(),
             id,
-            destinatarios: vec![0, 1, 2].iter().map(direccion_desde_id).collect() // TODO: cambiar esto
+            destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_alglobo(&id)).collect() // TODO: cambiar esto
         };
 
-        thread::spawn(move || CoordinadorTransaccion::responder(ret.protocolo, ret.responses));
+        thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses));
 
         ret
     }
 
-    fn submit(&mut self, pago: Pago) {
+    pub fn submit(&mut self, pago: Pago) {
         match self.log.get(&pago.get_id()) {
             None => self.full_protocol(&pago),
             Some(EstadoTransaccion::Wait) => self.full_protocol(&pago),
@@ -92,7 +93,7 @@ impl CoordinadorTransaccion {
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
 
-        self.send_and_wait(vec![mensaje, mensaje, mensaje], mensaje)
+        self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
     fn abort(&mut self, pago: &Pago) -> Resultado<()> {
@@ -104,12 +105,12 @@ impl CoordinadorTransaccion {
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::ABORT, self.id, id_op);
 
-        self.send_and_wait(vec![mensaje, mensaje, mensaje], mensaje)
+        self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
     //Queremos que se encargue de enviarle los mensajes a los destinatarios
     //y espere por sus respuestas, con un timeout y numero de intentos dado
-    fn send_and_wait(&self, 
+    fn send_and_wait(&mut self, 
                      mensajes: Vec<Mensaje>, 
                      esperado: Mensaje) -> Resultado<()> {
 
@@ -118,22 +119,22 @@ impl CoordinadorTransaccion {
 
         loop {
             for (idx, mensaje) in mensajes.iter().enumerate() {
-                self.protocolo.enviar(&mensaje, self.destinatarios[idx]).unwrap();
+                self.protocolo.enviar(&mensaje, self.destinatarios[idx].clone()).unwrap();
             }
             responses = self.responses.1.wait_timeout_while(self.responses.0.lock().unwrap(), TIMEOUT, |responses| responses.iter().any(Option::is_none));
 
             if responses.is_ok() { break; }
             println!("[COORDINATOR] timeout {}", esperado.id_op);
         }
-
-        if !responses.unwrap().0.iter().all(|opt| opt.is_some() && opt.unwrap() == esperado) {
+        //opt.is_some() && opt.unwrap() == esperado
+        if !responses.unwrap().0.iter().all(|opt| opt.as_ref().map_or(false, |r| r == &esperado)) {
             return Err(ErrorApp::Interno(ErrorInterno::new("Respuesta no esperada")));
         }
 
         Ok(())
     }
 
-    fn responder(protocolo: Protocolo, responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>) {
+    fn responder(mut protocolo: Protocolo, responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>) {
         loop {
             let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
             let id_emisor = mensaje.id_emisor;
