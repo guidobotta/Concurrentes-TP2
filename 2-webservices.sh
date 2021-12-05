@@ -1,3 +1,4 @@
+ID=$1
+
 cd webservices/
-cargo run
-cd ..
+cargo run $ID
