@@ -8,7 +8,7 @@ use std::io::{prelude::*};
 
 use super::pago::Pago;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum EstadoTransaccion {
     Prepare,
     Commit,
@@ -42,7 +42,7 @@ impl Transaccion {
     }
 
     pub fn get_pago(&self) -> Option<Pago> {
-        self.pago.and_then(|p| Some(p.clone()))
+        self.pago.as_ref().and_then(|p| Some(p.clone()))
     }
 
     pub fn prepare(&mut self) -> &Self { 
@@ -117,10 +117,13 @@ impl Log {
         self.log.get(id).and_then(|t| Some(t.clone()))
     }
 
-    pub fn insertar(&mut self, transaccion: &Transaccion) {
+    pub fn insertar(&mut self, transaccion: &Transaccion) {        
+        if let Some(t) = self.obtener(&transaccion.id) {
+            if t.estado == transaccion.estado { return; }
+        }
         let salida = self.formatear_transaccion(transaccion);
-        writeln!(self.archivo, "{}", salida).unwrap();
         self.log.insert(transaccion.id, transaccion.clone());
+        writeln!(self.archivo, "{}", salida).unwrap();
     }
 
     fn formatear_transaccion(&self, t: &Transaccion) -> String {

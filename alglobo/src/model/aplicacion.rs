@@ -78,7 +78,8 @@ impl Aplicacion {
                 if coordinador.submit(&transaccion).is_err() {
                     //Agregar a la lista de falladas
                     println!("El pago de id {} ha fallado", &transaccion.id_pago);
-                    escritor.escribir_fallido(transaccion.get_pago().unwrap());
+                    transaccion.get_pago()
+                    .and_then(|p| Some(escritor.escribir_fallido(p)));
                 }
             } else { //No somos el lider
             }
