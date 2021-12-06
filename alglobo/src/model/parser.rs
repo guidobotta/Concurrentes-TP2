@@ -31,7 +31,7 @@ impl Parser {
 
     /// Parsea el archivo de request.
     /// Metodo bloqueante, finaliza al terminar de procesar los requests.
-    pub fn parsear_pago(&mut self) -> Resultado<Option<Pago>> {
+    pub fn parsear_nuevo(&mut self, id: Option<usize>) -> Resultado<Option<Pago>> {
         let mut buffer = String::new();
 
         loop {

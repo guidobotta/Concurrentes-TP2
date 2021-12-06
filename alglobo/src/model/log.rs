@@ -41,6 +41,25 @@ impl Transaccion {
         } 
     }
 
+    pub fn get_pago(&self) -> Option<Pago> {
+        self.pago.and_then(|p| Some(p.clone()))
+    }
+
+    pub fn prepare(&mut self) -> &Self { 
+        self.estado = EstadoTransaccion::Prepare;
+        self
+    }
+
+    pub fn commit(&mut self) -> &Self { 
+        self.estado = EstadoTransaccion::Commit;
+        self
+    }
+
+    pub fn abort(&mut self) -> &Self { 
+        self.estado = EstadoTransaccion::Abort;
+        self
+    }
+
     pub fn es_reintento(&self) -> bool {
         self.reintento
     }
@@ -94,8 +113,8 @@ impl Log {
         transaccion
     }
 
-    pub fn obtener(&self, id: usize) -> Transaccion {
-        self.log.get(&id).unwrap().clone()
+    pub fn obtener(&self, id: &usize) -> Option<Transaccion> {
+        self.log.get(id).and_then(|t| Some(t.clone()))
     }
 
     pub fn insertar(&mut self, transaccion: &Transaccion) {

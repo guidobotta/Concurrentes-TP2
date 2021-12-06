@@ -4,7 +4,7 @@ use std::{thread};
 use std::time::Duration;
 use common::error::{ErrorApp, ErrorInterno, Resultado};
 use common::protocolo::Protocolo;
-use super::log::Log;
+use super::log::{Log, Transaccion, EstadoTransaccion};
 use super::pago::Pago;
 use common::mensaje::{Mensaje, CodigoMensaje};
 use common::dns::DNS;
@@ -15,15 +15,9 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TransactionId(u32);
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-enum EstadoTransaccion {
-    Wait,
-    Commit,
-    Abort,
-}
 
 pub struct CoordinadorTransaccion {
-    log: Log,
+    log: Arc<Log>,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
@@ -31,12 +25,12 @@ pub struct CoordinadorTransaccion {
 }
 
 impl CoordinadorTransaccion {
-    pub fn new(id: usize, log: &Log) -> Self {
+    pub fn new(id: usize, log: Arc<Log>) -> Self {
 
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
         let ret = CoordinadorTransaccion {
-            log: log.clone(),
+            log,
             protocolo: protocolo.clone(),
             responses: responses.clone(),
             id,
@@ -48,33 +42,36 @@ impl CoordinadorTransaccion {
         ret
     }
 
-    pub fn submit(&mut self, pago: Pago) -> Resultado<()>{
-        match self.log.get(&pago.get_id()) {
-            None => self.full_protocol(&pago),
-            Some(EstadoTransaccion::Wait) => self.full_protocol(&pago),
-            Some(EstadoTransaccion::Commit) => { self.commit(&pago) },
-            Some(EstadoTransaccion::Abort) => { 
-                let _ = self.abort(&pago);
-                return Err(ErrorApp::Interno(ErrorInterno::new("Pago abortado")));
+    pub fn submit(&mut self, transaccion: &Transaccion) -> Resultado<()>{
+        match self.log.obtener(&transaccion.id) {
+            None => self.full_protocol(&transaccion),
+            Some(t) => match t.estado {
+                EstadoTransaccion::Prepare => self.full_protocol(&transaccion),
+                EstadoTransaccion::Commit => { self.commit(&transaccion) },
+                EstadoTransaccion::Abort => { 
+                    let _ = self.abort(&transaccion);
+                    return Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")));
+                }
             }
         }
     }
 
-    fn full_protocol(&mut self, pago: &Pago) -> Resultado<()> {
-        match self.prepare(pago) {
-            Ok(_) => { self.commit(pago) }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
+    fn full_protocol(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+        match self.prepare(transaccion) {
+            Ok(_) => { self.commit(transaccion) }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
             Err(e) => { 
-                let _ = self.abort(pago); // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
+                let _ = self.abort(transaccion); // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
                 Err(e)
              } 
         }
     }
 
-    fn prepare(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), EstadoTransaccion::Wait);
-        println!("[COORDINATOR] prepare {}", pago.get_id());
+    fn prepare(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+        self.log.insertar(transaccion.prepare());
+        println!("[COORDINATOR] prepare {}", transaccion.id);
 
-        let id_op = pago.get_id();
+        let id_op = transaccion.id_pago;
+        let pago = transaccion.get_pago().unwrap();
 
         // Preparo los mensajes a enviar
         let m_hotel = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_hotel()}, self.id, id_op);
@@ -87,11 +84,11 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
     }
 
-    fn commit(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), EstadoTransaccion::Commit);
-        println!("[COORDINATOR] commit {}", pago.get_id());
+    fn commit(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+        self.log.insertar(transaccion.commit());
+        println!("[COORDINATOR] commit {}", transaccion.id);
 
-        let id_op = pago.get_id();
+        let id_op = transaccion.id_pago;
 
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
@@ -99,11 +96,11 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
-    fn abort(&mut self, pago: &Pago) -> Resultado<()> {
-        self.log.insert(pago.get_id(), EstadoTransaccion::Abort);
-        println!("[COORDINATOR] abort {}", pago.get_id());
+    fn abort(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+        self.log.insertar(transaccion.abort());
+        println!("[COORDINATOR] abort {}", transaccion.id);
 
-        let id_op = pago.get_id();
+        let id_op = transaccion.id_pago;
 
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::ABORT, self.id, id_op);
