@@ -4,6 +4,7 @@ use std::{thread};
 use std::time::Duration;
 use common::error::{ErrorApp, ErrorInterno, Resultado};
 use common::protocolo::Protocolo;
+use super::log::Log;
 use super::pago::Pago;
 use common::mensaje::{Mensaje, CodigoMensaje};
 use common::dns::DNS;
@@ -22,20 +23,20 @@ enum EstadoTransaccion {
 }
 
 pub struct CoordinadorTransaccion {
-    log: HashMap<usize, EstadoTransaccion>,
+    log: Log,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
-    destinatarios: Vec<String>
+    destinatarios: Vec<String>,
 }
 
 impl CoordinadorTransaccion {
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: usize, log: &Log) -> Self {
 
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
         let ret = CoordinadorTransaccion {
-            log: HashMap::new(),
+            log: log.clone(),
             protocolo: protocolo.clone(),
             responses: responses.clone(),
             id,

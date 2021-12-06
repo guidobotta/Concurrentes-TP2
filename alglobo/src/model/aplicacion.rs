@@ -5,17 +5,14 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::{leader_election::LeaderElection, escritor_fallidos::EscritorFallidos};
+use super::{leader_election::LeaderElection, escritor_fallidos::EscritorFallidos, log::Log};
 use super::pago::Pago;
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
 
-static NUMERO_REPLICAS: usize = 10;
-static TIMEOUT: usize = 3000; //Milis
-
 pub struct Aplicacion {
     handle: JoinHandle<()>,
-    continuar: Arc<AtomicBool>,
+    continuar: Arc<AtomicBool>
 }
 
 impl Aplicacion {
@@ -47,14 +44,19 @@ impl Aplicacion {
         mut escritor: EscritorFallidos,
         continuar: Arc<AtomicBool>,
     ) {
-        let mut coordinador = CoordinadorTransaccion::new(id);
+        let mut log = Log::new("./files/estado.log".to_string()).unwrap();
+        let mut coordinador = CoordinadorTransaccion::new(id, &log);
+        let mut inicio_lider = true;
+        let mut transaccion;
+
         while continuar.load(Ordering::Relaxed) {
             if lider.am_i_leader() {
-                //if !conexion_establecida {
-                //    //Conectar con webservices
-                //    Aplicacion::sincronizar();
-                //}
-
+                if (inicio_lider) {
+                    transaccion = log.ultima_transaccion();
+                    inicio_lider = false;
+                } else { // else if (reintentar) ...
+                    transaccion = log.nueva_transaccion();
+                }
                 let pago = match parseador.parsear_pago().ok() {
                     Some(Some(r)) => r,
                     _ => break,
@@ -115,6 +117,3 @@ impl Aplicacion {
 //Nuestra aplicacion levanta un archivo de pagos y lo lee secuencialmente.
 //Para reintentar los pagos no finalizados, podemos almacenarlos en un archivo y reintentarlos secuencialmente?
 //Instanciamos la aplicacion con el nuevo path
-
-
-

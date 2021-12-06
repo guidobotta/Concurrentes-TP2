@@ -1,5 +1,6 @@
 RUTA=$1
-ID=$2
+FALLIDOS=$2
+ID=$3
 
 cd alglobo/
-cargo run $RUTA $ID
+cargo run $RUTA $FALLIDOS $ID
