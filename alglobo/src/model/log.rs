@@ -178,4 +178,13 @@ impl Log {
     pub fn ultima_transaccion(&self) -> Transaccion {
         self.ultima_trans.clone()
     }
+
+    pub fn clone(&self) -> Self {
+        Log { 
+            archivo: self.archivo.try_clone().unwrap(),
+            log: self.log.clone(),
+            siguiente_id: self.siguiente_id.clone(),
+            ultima_trans: self.ultima_trans.clone()
+        }
+    }
 }
