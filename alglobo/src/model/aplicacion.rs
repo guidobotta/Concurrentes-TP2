@@ -115,3 +115,6 @@ impl Aplicacion {
 //Nuestra aplicacion levanta un archivo de pagos y lo lee secuencialmente.
 //Para reintentar los pagos no finalizados, podemos almacenarlos en un archivo y reintentarlos secuencialmente?
 //Instanciamos la aplicacion con el nuevo path
+
+
+
