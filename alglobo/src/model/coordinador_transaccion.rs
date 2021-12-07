@@ -1,4 +1,3 @@
-use std::collections::{HashMap};
 use std::sync::{Arc, Condvar, Mutex};
 use std::{thread};
 use std::time::Duration;

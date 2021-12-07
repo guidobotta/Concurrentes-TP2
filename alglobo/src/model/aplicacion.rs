@@ -63,7 +63,7 @@ impl Aplicacion {
                     //    transaccion.pago = parseador.parsear_nuevo(Some(transaccion.id_pago)).unwrap();
                     //}
                     //let prox_pago = transaccion.id_pago_prox;
-                    //inicio_lider = false;
+                    inicio_lider = false;
                 } else if false { //Reintento, mensaje por socket.
                     //pago = socket.reintento();
                     //transaccion = log.nueva_transaccion(prox_pago);
@@ -75,13 +75,14 @@ impl Aplicacion {
                     transaccion.pago = parseador.parsear_nuevo(None).unwrap()
                 }
                 //Procesar transaccion
-                if coordinador.submit(&transaccion).is_err() {
+                if coordinador.submit(&mut transaccion).is_err() {
                     //Agregar a la lista de falladas
                     println!("El pago de id {} ha fallado", &transaccion.id_pago);
                     transaccion.get_pago()
                     .and_then(|p| Some(escritor.escribir_fallido(p)));
                 }
             } else { //No somos el lider
+                inicio_lider = true;
             }
         }
     }

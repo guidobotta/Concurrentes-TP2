@@ -5,9 +5,9 @@ use regex::Regex;
 /// Clase utilizada para parsear los distintos request recibidos mediante texto.
 #[derive(Debug)]
 pub struct Parser {
-    reader: io::BufReader<File>,
+    lector: io::BufReader<File>,
     matcher: Regex,
-    _posicion: usize,
+    posicion: usize,
 }
 
 use std::{
@@ -21,7 +21,7 @@ impl Parser {
     pub fn new(path: impl AsRef<std::path::Path>) -> Resultado<Parser> {
         let file = File::open(path)?;
         let parser = Parser {
-            reader: io::BufReader::new(file),
+            lector: io::BufReader::new(file),
             matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$")?,
             _posicion: 0,
         };
