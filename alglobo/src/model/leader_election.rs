@@ -1,15 +1,9 @@
-use std::any::Any;
-use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader, Write};
 use std::mem::size_of;
-use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::net::UdpSocket;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 use common::dns::DNS;
-
-use rand::{thread_rng, Rng};
 use std::convert::TryInto;
 
 fn id_to_ctrladdr(id: usize) -> String {

@@ -44,7 +44,7 @@ impl Aplicacion {
         mut escritor: EscritorFallidos,
         continuar: Arc<AtomicBool>,
     ) {
-        let mut log = Arc::new(Log::new("./files/estado.log".to_string()).unwrap());
+        let mut log = Log::new("./files/estado.log".to_string()).unwrap();
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
         let mut inicio_lider = true;
         let mut transaccion;
@@ -64,7 +64,7 @@ impl Aplicacion {
                     //}
                     //let prox_pago = transaccion.id_pago_prox;
                     inicio_lider = false;
-                } else if false { //Reintento, mensaje por socket.
+                } else if false { // !cola_reintentos.empty? { //Reintento, mensaje por socket.
                     //pago = socket.reintento();
                     //transaccion = log.nueva_transaccion(prox_pago);
                     //transaccion.id_pago = pago.id;

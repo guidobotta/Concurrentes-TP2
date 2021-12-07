@@ -16,7 +16,7 @@ struct TransactionId(u32);
 
 
 pub struct CoordinadorTransaccion {
-    log: Arc<Log>,
+    log: Log,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
@@ -24,7 +24,7 @@ pub struct CoordinadorTransaccion {
 }
 
 impl CoordinadorTransaccion {
-    pub fn new(id: usize, log: Arc<Log>) -> Self {
+    pub fn new(id: usize, log: Log) -> Self {
 
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
@@ -41,21 +41,21 @@ impl CoordinadorTransaccion {
         ret
     }
 
-    pub fn submit(&mut self, transaccion: &Transaccion) -> Resultado<()>{
+    pub fn submit(&mut self, transaccion: &mut Transaccion) -> Resultado<()>{
         match self.log.obtener(&transaccion.id) {
-            None => self.full_protocol(&transaccion),
+            None => self.full_protocol(transaccion),
             Some(t) => match t.estado {
-                EstadoTransaccion::Prepare => self.full_protocol(&transaccion),
-                EstadoTransaccion::Commit => { self.commit(&transaccion) },
+                EstadoTransaccion::Prepare => self.full_protocol(transaccion),
+                EstadoTransaccion::Commit => { self.commit(transaccion) },
                 EstadoTransaccion::Abort => { 
-                    let _ = self.abort(&transaccion);
+                    let _ = self.abort(transaccion);
                     return Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")));
                 }
             }
         }
     }
 
-    fn full_protocol(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+    fn full_protocol(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         match self.prepare(transaccion) {
             Ok(_) => { self.commit(transaccion) }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
             Err(e) => { 
@@ -65,7 +65,7 @@ impl CoordinadorTransaccion {
         }
     }
 
-    fn prepare(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+    fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.prepare());
         println!("[COORDINATOR] prepare {}", transaccion.id);
 
@@ -83,7 +83,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
     }
 
-    fn commit(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+    fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.commit());
         println!("[COORDINATOR] commit {}", transaccion.id);
 
@@ -95,7 +95,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
-    fn abort(&mut self, transaccion: &Transaccion) -> Resultado<()> {
+    fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.abort());
         println!("[COORDINATOR] abort {}", transaccion.id);
 
