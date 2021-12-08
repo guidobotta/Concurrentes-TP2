@@ -1,4 +1,4 @@
-use common::error::{ErrorApp, ErrorInterno, Resultado};
+use super::error::{ErrorApp, ErrorInterno, Resultado};
 
 #[derive(Clone, PartialEq)]
 pub enum CodigoLider {
