@@ -6,3 +6,4 @@ pub mod coordinador_transaccion;
 pub mod escritor_fallidos;
 pub mod log;
 pub mod parser_fallidos;
+pub mod mensaje_lider;

@@ -6,10 +6,6 @@ use std::time::Duration;
 use common::dns::DNS;
 use std::convert::TryInto;
 
-fn id_to_ctrladdr(id: usize) -> String {
-    DNS::direccion_lider(&id)
-}
-
 const TEAM_MEMBERS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -25,7 +21,7 @@ impl EleccionLider {
     pub fn new(id: usize) -> EleccionLider {
         let mut ret = EleccionLider {
             id,
-            socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
+            socket: UdpSocket::bind(DNS::direccion_lider(&id)).unwrap(),
             leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
@@ -66,7 +62,7 @@ impl EleccionLider {
 
         *self.got_ok.0.lock().unwrap() = false;
         *self.leader_id.0.lock().unwrap() = None;
-        self.enviar_election();
+        self.enviar_eleccion();
         let got_ok =
             self.got_ok
                 .1
@@ -89,11 +85,11 @@ impl EleccionLider {
         msg
     }
 
-    fn enviar_election(&self) {
+    fn enviar_eleccion(&self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
         let msg = self.id_a_mensaje(b'E');
         for peer_id in (self.id + 1)..TEAM_MEMBERS {
-            self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
+            self.socket.send_to(&msg, DNS::direccion_lider(&peer_id)).unwrap();
         }
     }
 
@@ -104,7 +100,7 @@ impl EleccionLider {
 
         for peer_id in 0..TEAM_MEMBERS {
             if peer_id != self.id {
-                self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
+                self.socket.send_to(&msg, DNS::direccion_lider(&peer_id)).unwrap();
             }
         }
         
@@ -130,7 +126,7 @@ impl EleccionLider {
                     println!("[{}] recibí Election de {}", self.id, id_from);
                     if id_from < self.id {
                         self.socket
-                            .send_to(&self.id_a_mensaje(b'O'), id_to_ctrladdr(id_from))
+                            .send_to(&self.id_a_mensaje(b'O'), DNS::direccion_lider(&id_from))
                             .unwrap();
                         let mut me = self.clone();
                         thread::spawn(move || me.buscar_nuevo_lider());
