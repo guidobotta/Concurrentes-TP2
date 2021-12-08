@@ -1,7 +1,6 @@
 mod model;
 use model::aplicacion::Aplicacion;
 use common::error::Resultado;
-use model::escritor_fallidos::EscritorFallidos;
 use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
 

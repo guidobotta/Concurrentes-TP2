@@ -4,7 +4,6 @@ use std::time::Duration;
 use common::error::{ErrorApp, ErrorInterno, Resultado};
 use common::protocolo::Protocolo;
 use super::log::{Log, Transaccion, EstadoTransaccion};
-use super::pago::Pago;
 use common::mensaje::{Mensaje, CodigoMensaje};
 use common::dns::DNS;
 

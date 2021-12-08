@@ -5,8 +5,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::{eleccion_lider::EleccionLider, parser_fallidos::ParserFallidos, log::{Log, Transaccion}};
-use super::pago::Pago;
+use super::{eleccion_lider::EleccionLider, parser_fallidos::ParserFallidos, log::Log};
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
 
