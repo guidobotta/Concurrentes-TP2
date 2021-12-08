@@ -5,7 +5,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::{leader_election::LeaderElection, escritor_fallidos::EscritorFallidos, log::{Log, Transaccion}};
+use super::{eleccion_lider::EleccionLider, escritor_fallidos::EscritorFallidos, log::{Log, Transaccion}};
 use super::pago::Pago;
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
@@ -18,7 +18,7 @@ pub struct Aplicacion {
 impl Aplicacion {
     pub fn new(
         id: usize, 
-        lider: LeaderElection, 
+        lider: EleccionLider, 
         parseador: Parser,
         escritor: EscritorFallidos) -> Resultado<Aplicacion> {
         //let protocolo = Protocolo::new(Aplicacion::direccion_desde_id(id))?;
@@ -39,7 +39,7 @@ impl Aplicacion {
 
     fn procesar(
         id: usize,
-        lider: LeaderElection,
+        lider: EleccionLider,
         mut parseador: Parser,
         mut escritor: EscritorFallidos,
         continuar: Arc<AtomicBool>,
@@ -51,7 +51,7 @@ impl Aplicacion {
         let mut prox_pago = 0;
 
         while continuar.load(Ordering::Relaxed) {
-            if lider.am_i_leader() {
+            if lider.soy_lider() {
                 if inicio_lider {
                     transaccion = Transaccion::default(0);
                     //Aca obtenemos la ultima transaccion que puede o no ser un reintento
