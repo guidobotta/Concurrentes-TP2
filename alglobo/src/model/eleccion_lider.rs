@@ -1,12 +1,9 @@
 use common::mensaje_lider::{CodigoLider, MensajeLider};
 use common::protocolo::Protocolo;
-use std::mem::size_of;
-use std::net::UdpSocket;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 use common::dns::DNS;
-use std::convert::TryInto;
 
 const TEAM_MEMBERS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -90,7 +87,7 @@ impl EleccionLider {
         msg
     }
 
-    fn enviar_eleccion(&self) {
+    fn enviar_eleccion(&mut self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
         let mensaje = MensajeLider::new(CodigoLider::ELECCION, self.id);
         for peer_id in (self.id + 1)..TEAM_MEMBERS {
@@ -98,7 +95,7 @@ impl EleccionLider {
         }
     }
 
-    fn anunciarme_lider(&self) {
+    fn anunciarme_lider(&mut self) {
         // El nuevo coordinador se anuncia con un mensaje COORDINATOR
         println!("[{}] me anuncio como lider", self.id);
         let mensaje = MensajeLider::new(CodigoLider::COORDINADOR, self.id);
