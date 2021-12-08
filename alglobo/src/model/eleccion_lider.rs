@@ -1,3 +1,5 @@
+use common::mensaje_lider::{CodigoLider, MensajeLider};
+use common::protocolo::Protocolo;
 use std::mem::size_of;
 use std::net::UdpSocket;
 use std::sync::{Arc, Condvar, Mutex};
@@ -6,28 +8,26 @@ use std::time::Duration;
 use common::dns::DNS;
 use std::convert::TryInto;
 
-fn id_to_ctrladdr(id: usize) -> String {
-    DNS::direccion_lider(&id)
-}
-
 const TEAM_MEMBERS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct EleccionLider {
     id: usize,
-    socket: UdpSocket,
-    leader_id: Arc<(Mutex<Option<usize>>, Condvar)>,
-    got_ok: Arc<(Mutex<bool>, Condvar)>,
+    protocolo: Protocolo,
+    id_lider: Arc<(Mutex<Option<usize>>, Condvar)>,
+    obtuve_ok: Arc<(Mutex<bool>, Condvar)>,
     stop: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl EleccionLider {
     pub fn new(id: usize) -> EleccionLider {
+        let protocolo = Protocolo::new(DNS::direccion_lider(&id)).unwrap();
+
         let mut ret = EleccionLider {
             id,
-            socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
-            leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
-            got_ok: Arc::new((Mutex::new(false), Condvar::new())),
+            protocolo,
+            id_lider: Arc::new((Mutex::new(Some(id)), Condvar::new())),
+            obtuve_ok: Arc::new((Mutex::new(false), Condvar::new())),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
         };
 
@@ -43,10 +43,10 @@ impl EleccionLider {
     }
 
     pub fn get_id_lider(&self) -> usize {
-        self.leader_id
+        self.id_lider
             .1
-            .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
-                leader_id.is_none()
+            .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
+                id_lider.is_none()
             })
             .unwrap()
             .unwrap()
@@ -57,28 +57,29 @@ impl EleccionLider {
             return;
         }
 
-        if self.leader_id.0.lock().unwrap().is_none() {
+        if self.id_lider.0.lock().unwrap().is_none() {
             // ya esta buscando lider
             return;
         }
 
         println!("[{}] buscando lider", self.id);
 
-        *self.got_ok.0.lock().unwrap() = false;
-        *self.leader_id.0.lock().unwrap() = None;
-        self.enviar_election();
-        let got_ok =
-            self.got_ok
+        *self.obtuve_ok.0.lock().unwrap() = false;
+        *self.id_lider.0.lock().unwrap() = None;
+
+        self.enviar_eleccion();
+        let obtuve_ok =
+            self.obtuve_ok
                 .1
-                .wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
+                .wait_timeout_while(self.obtuve_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
                 
-        if !*got_ok.unwrap().0 {
+        if !*obtuve_ok.unwrap().0 {
             self.anunciarme_lider()
         } else {
-            self.leader_id
+            self.id_lider
                 .1
-                .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
-                    leader_id.is_none()
+                .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
+                    id_lider.is_none()
                 });
         }
     }
@@ -89,63 +90,65 @@ impl EleccionLider {
         msg
     }
 
-    fn enviar_election(&self) {
+    fn enviar_eleccion(&self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
-        let msg = self.id_a_mensaje(b'E');
+        let mensaje = MensajeLider::new(CodigoLider::ELECCION, self.id);
         for peer_id in (self.id + 1)..TEAM_MEMBERS {
-            self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
+            self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
         }
     }
 
     fn anunciarme_lider(&self) {
         // El nuevo coordinador se anuncia con un mensaje COORDINATOR
         println!("[{}] me anuncio como lider", self.id);
-        let msg = self.id_a_mensaje(b'C');
+        let mensaje = MensajeLider::new(CodigoLider::COORDINADOR, self.id);
 
         for peer_id in 0..TEAM_MEMBERS {
             if peer_id != self.id {
-                self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
+                self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
             }
         }
         
-        *self.leader_id.0.lock().unwrap() = Some(self.id);
+        *self.id_lider.0.lock().unwrap() = Some(self.id);
     }
 
     fn responder(&mut self) {
         while !*self.stop.0.lock().unwrap() {
-            let mut buf = [0; size_of::<usize>() + 1];
-            let (size, from) = self.socket.recv_from(&mut buf).unwrap();
-            let id_from = usize::from_le_bytes(buf[1..].try_into().unwrap());
+            let mensaje = self.protocolo.recibir_lider(None).unwrap(); // TODO: revisar el timeout
+            let id_emisor = mensaje.id_emisor;
+
             if *self.stop.0.lock().unwrap() {
                 break;
             }
 
-            match &buf[0] {
-                b'O' => {
-                    println!("[{}] recibí OK de {}", self.id, id_from);
-                    *self.got_ok.0.lock().unwrap() = true;
-                    self.got_ok.1.notify_all();
+            match mensaje.codigo {        
+                CodigoLider::OK => {
+                    println!("[ELECCION {}] recibí OK de {}", self.id, id_emisor);
+                    *self.obtuve_ok.0.lock().unwrap() = true;
+                    self.obtuve_ok.1.notify_all();
                 }
-                b'E' => {
-                    println!("[{}] recibí Election de {}", self.id, id_from);
-                    if id_from < self.id {
-                        self.socket
-                            .send_to(&self.id_a_mensaje(b'O'), id_to_ctrladdr(id_from))
-                            .unwrap();
+                CodigoLider::ELECCION => {
+                    println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
+                    if id_emisor < self.id {
+                        // TODO: Sacar a una función auxiliar
+                        let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
+                        self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_emisor));
+                        
                         let mut me = self.clone();
                         thread::spawn(move || me.buscar_nuevo_lider());
                     }
                 }
-                b'C' => {
-                    println!("[{}] recibí nuevo coordinador {}", self.id, id_from);
-                    *self.leader_id.0.lock().unwrap() = Some(id_from);
-                    self.leader_id.1.notify_all();
+                CodigoLider::COORDINADOR => {
+                    println!("[ELECCION {}] recibí COORDINADOR de {}", self.id, id_emisor);
+                    *self.id_lider.0.lock().unwrap() = Some(id_emisor);
+                    self.id_lider.1.notify_all();
                 }
                 _ => {
-                    println!("[{}] ??? {}", self.id, id_from);
+                    println!("[ELECCION {}] recibí algo que no puedo interpretar {}", self.id, id_emisor);
                 }
             }
         }
+
         *self.stop.0.lock().unwrap() = false;
         self.stop.1.notify_all();
     }
@@ -160,9 +163,9 @@ impl EleccionLider {
     fn clone(&self) -> EleccionLider {
         EleccionLider {
             id: self.id,
-            socket: self.socket.try_clone().unwrap(),
-            leader_id: self.leader_id.clone(),
-            got_ok: self.got_ok.clone(),
+            protocolo: self.protocolo.clone(),
+            id_lider: self.id_lider.clone(),
+            obtuve_ok: self.obtuve_ok.clone(),
             stop: self.stop.clone(),
         }
     }

@@ -22,7 +22,9 @@ fn type_of<T>(_: T) -> &'static str {
 }
 
 impl Mensaje {
-    pub fn new(codigo: CodigoMensaje, id_emisor: usize, id_op: usize) -> Self { Self { codigo, id_emisor, id_op } }
+    pub fn new(codigo: CodigoMensaje, id_emisor: usize, id_op: usize) -> Self { 
+        Self { codigo, id_emisor, id_op } 
+    }
 
     pub fn codificar(&self) -> String {
         match &self.codigo {
@@ -43,7 +45,8 @@ impl Mensaje {
             _ => return Err(ErrorApp::Interno(ErrorInterno::new(&format!("Mensaje erroneo: {}", parseado[0])))),
         };
 
-        Ok(Mensaje::new(codigo, 
+        Ok(Mensaje::new(
+            codigo, 
             parseado[1].parse::<usize>()?, 
             parseado[2].parse::<usize>()?
         ))
