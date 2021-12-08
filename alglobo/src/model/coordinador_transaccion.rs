@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 use std::{thread};
 use std::time::Duration;
 use common::error::{ErrorApp, ErrorInterno, Resultado};
@@ -20,24 +22,34 @@ pub struct CoordinadorTransaccion {
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
     destinatarios: Vec<String>,
+    continuar: Arc<AtomicBool>,
+    respondedor: JoinHandle<()>
 }
 
 impl CoordinadorTransaccion {
     pub fn new(id: usize, log: Log) -> Self {
-
+        println!("Creo el coordinador con id {}", id);
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
+        let continuar = Arc::new(AtomicBool::new(false));
         let ret = CoordinadorTransaccion {
             log,
             protocolo: protocolo.clone(),
             responses: responses.clone(),
             id,
-            destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_webservice(&id)).collect() // TODO: cambiar esto
+            destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_webservice(&id)).collect(), // TODO: cambiar esto
+            continuar: continuar.clone(),
+            respondedor: thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses, continuar))
         };
 
-        thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses));
 
         ret
+    }
+
+    pub fn finalizar(self) {
+        self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
+        //self.protocolo.finalizar();
+        let _ = self.respondedor.join();
     }
 
     pub fn submit(&mut self, transaccion: &mut Transaccion) -> Resultado<()>{
@@ -132,8 +144,11 @@ impl CoordinadorTransaccion {
         Ok(())
     }
 
-    fn responder(mut protocolo: Protocolo, responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>) {
-        loop {
+    fn responder(mut protocolo: Protocolo, 
+                responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
+                continuar: Arc<AtomicBool>) {
+
+        while continuar.load(Ordering::Relaxed) {
             let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
             let id_emisor = mensaje.id_emisor;
 

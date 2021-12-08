@@ -52,12 +52,15 @@ impl Aplicacion {
     }
 
     fn procesar_lider(lider: &EleccionLider, parseador: &mut Parser, id: usize) {
+        println!("Llegamos a procesar_lider");
+        
         let mut log = Log::new("./files/estado.log".to_string()).unwrap();
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
         let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
         let mut inicio_lider = true;
         let mut transaccion;
         let mut prox_pago = 1;
+
 
         while lider.soy_lider() {
             //Este if inicio_lider se puede sacar fuera del while, porque ya sabemos que es lider
@@ -75,11 +78,15 @@ impl Aplicacion {
                 transaccion.pago = Some(parser_fallidos.parsear_fallido(transaccion.id_pago).unwrap().unwrap());
             } else {
                 transaccion = log.nueva_transaccion(prox_pago);
-                transaccion.pago = match parseador.parsear_nuevo(None).ok() {
-                    Some(None) => break,
+                transaccion.pago = match parseador.parsear_nuevo(Some(prox_pago)).ok() {
+                    Some(None) => {
+                        coordinador.finalizar();
+                        break;
+                    },
                     Some(p) => p,
                     _ => {panic!("Algo malo paso")}
                 };
+                prox_pago += 1;
             }
             //Procesar transaccion
             if coordinador.submit(&mut transaccion).is_err() {

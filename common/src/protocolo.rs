@@ -12,6 +12,7 @@ pub struct Protocolo {
 
 impl Protocolo {
     pub fn new(direccion: String) -> Resultado<Protocolo> {
+        println!("Creo un protocolo con dir {}", &direccion);
         Ok(Protocolo {
             skt: UdpSocket::bind(direccion)?,
         })
@@ -49,6 +50,10 @@ impl Protocolo {
             return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
         }
         MensajeLider::decodificar(&String::from_utf8(buffer[..recibido].to_vec()).unwrap())
+    }
+
+    pub fn finalizar(&mut self) {
+        //self.skt.
     }
 
     pub fn clone(&self) -> Self {

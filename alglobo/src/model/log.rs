@@ -79,6 +79,7 @@ impl Log {
     pub fn new(path: String) -> Resultado<Self> {
         
         let mut archivo = fs::OpenOptions::new()
+                         .read(true)                 
                          .write(true)
                          .append(true)
                          .create(true)
@@ -145,24 +146,23 @@ impl Log {
                 None => continue,
                 Some(value) => value,
             };
-
             let transaccion = self.parsear_transaccion(cap).unwrap();
             self.siguiente_id = std::cmp::max(self.siguiente_id - 1, transaccion.id) + 1;
             ultimo_id = transaccion.id;
             self.log.insert(transaccion.id, transaccion);
         }
 
-        self.ultima_trans = Some(self.log.get(&ultimo_id).unwrap().clone());
+        self.ultima_trans = self.log.get(&ultimo_id).and_then(|t| Some(t.clone()));
     }
 
 
     fn parsear_transaccion(&self, argumentos: regex::Captures) -> Resultado<Transaccion> {
-        let trans_id = argumentos[0].parse::<usize>()?;
-        let pago_id = argumentos[1].parse::<usize>()?;
-        let prox_pago_id = argumentos[2].parse::<usize>()?;
-        let operacion = &argumentos[3];
-        let reintento = &argumentos[4] == "R";
-
+        let trans_id = argumentos[1].parse::<usize>()?;
+        let pago_id = argumentos[2].parse::<usize>()?;
+        let prox_pago_id = argumentos[3].parse::<usize>()?;
+        let operacion = &argumentos[4];
+        let reintento = &argumentos[5] == "R";
+        
         let estado = match operacion {
              "COMMIT" => EstadoTransaccion::Commit,
              "ABORT" => EstadoTransaccion::Abort,
