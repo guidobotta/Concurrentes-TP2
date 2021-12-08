@@ -53,10 +53,11 @@ impl Aplicacion {
             }
         }
     }
-    
+
     fn procesar_lider(lider: &LeaderElection, parseador: &mut Parser, id: usize) {
         let mut log = Log::new("./files/estado.log".to_string()).unwrap();
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
+        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
         let mut inicio_lider = true;
         let mut transaccion;
         let mut prox_pago = 0;
@@ -64,26 +65,25 @@ impl Aplicacion {
         while lider.am_i_leader() {
             //Este if inicio_lider se puede sacar fuera del while, porque ya sabemos que es lider
             if inicio_lider {
-                transaccion = Transaccion::default(0);
                 //Aca obtenemos la ultima transaccion que puede o no ser un reintento
-                //transaccion = log.ultima_transaccion();
+                transaccion = log.ultima_transaccion();
                 //if transaccion.es_reintento() {
-                //    transaccion.pago = parseador.parsear_fallidos(transaccion.id_pago).unwrap();
+                //    transaccion.pago = parser_fallidos.parsear(transaccion.id_pago).unwrap();
                 //    prox_pago = transaccion.id_pago_prox
                 //} else {
                 //    transaccion.pago = parseador.parsear_nuevo(Some(transaccion.id_pago)).unwrap();
                 //}
                 //let prox_pago = transaccion.id_pago_prox;
+                parseador.actualizar(transaccion.id_pago_prox);
                 inicio_lider = false;
             } else if false { // !cola_reintentos.empty? { //Reintento, mensaje por socket.
                 //pago = socket.reintento();
-                //transaccion = log.nueva_transaccion(prox_pago);
+                transaccion = log.nueva_transaccion(prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
                 //transaccion.id_pago = pago.id;
-                //transaccion.pago = parseador.parsear_fallidos(pago.id);
-                transaccion = Transaccion::default(0);
+                transaccion.pago = parseador_fallidos.parsear(transaccion.id_pago);
             } else {
                 transaccion = log.nueva_transaccion(prox_pago);
-                transaccion.pago = parseador.parsear_nuevo(None).unwrap()
+                transaccion.pago = parseador.parsear().unwrap()
             }
             //Procesar transaccion
             if coordinador.submit(&mut transaccion).is_err() {

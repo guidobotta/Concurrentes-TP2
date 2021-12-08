@@ -71,7 +71,7 @@ impl CoordinadorTransaccion {
 
         let id_op = transaccion.id_pago;
         let pago = transaccion.get_pago().unwrap();
-
+        //TODO: Hay que cambiar en el Mensaje el id_op por id_transaccion, sino no vamos a poder reintentar.
         // Preparo los mensajes a enviar
         let m_hotel = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_hotel()}, self.id, id_op);
         let m_aerolinea = Mensaje::new(CodigoMensaje::PREPARE { monto: pago.get_monto_aerolinea()}, self.id, id_op);
