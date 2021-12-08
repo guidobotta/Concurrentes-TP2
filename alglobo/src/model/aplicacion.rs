@@ -76,7 +76,11 @@ impl Aplicacion {
                 transaccion.pago = Some(parser_fallidos.parsear_fallido(transaccion.id_pago).unwrap().unwrap());
             } else {
                 transaccion = log.nueva_transaccion(prox_pago);
-                transaccion.pago = Some(parseador.parsear_nuevo(None).unwrap().unwrap());
+                transaccion.pago = match parseador.parsear_nuevo(None).ok() {
+                    Some(None) => break,
+                    Some(p) => p,
+                    _ => {panic!("Algo malo paso")}
+                };
             }
             //Procesar transaccion
             if coordinador.submit(&mut transaccion).is_err() {
