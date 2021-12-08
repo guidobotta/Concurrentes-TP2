@@ -13,7 +13,7 @@ fn id_to_ctrladdr(id: usize) -> String {
 const TEAM_MEMBERS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(10);
 
-pub struct LeaderElection {
+pub struct EleccionLider {
     id: usize,
     socket: UdpSocket,
     leader_id: Arc<(Mutex<Option<usize>>, Condvar)>,
@@ -21,9 +21,9 @@ pub struct LeaderElection {
     stop: Arc<(Mutex<bool>, Condvar)>,
 }
 
-impl LeaderElection {
-    pub fn new(id: usize) -> LeaderElection {
-        let mut ret = LeaderElection {
+impl EleccionLider {
+    pub fn new(id: usize) -> EleccionLider {
+        let mut ret = EleccionLider {
             id,
             socket: UdpSocket::bind(id_to_ctrladdr(id)).unwrap(),
             leader_id: Arc::new((Mutex::new(Some(id)), Condvar::new())),
@@ -34,15 +34,15 @@ impl LeaderElection {
         let mut clone = ret.clone();
         thread::spawn(move || clone.responder());
 
-        ret.find_new();
+        ret.buscar_nuevo_lider();
         ret
     }
 
-    pub fn am_i_leader(&self) -> bool {
-        self.get_leader_id() == self.id
+    pub fn soy_lider(&self) -> bool {
+        self.get_id_lider() == self.id
     }
 
-    pub fn get_leader_id(&self) -> usize {
+    pub fn get_id_lider(&self) -> usize {
         self.leader_id
             .1
             .wait_while(self.leader_id.0.lock().unwrap(), |leader_id| {
@@ -52,24 +52,28 @@ impl LeaderElection {
             .unwrap()
     }
 
-    pub fn find_new(&mut self) {
+    pub fn buscar_nuevo_lider(&mut self) {
         if *self.stop.0.lock().unwrap() {
             return;
         }
+
         if self.leader_id.0.lock().unwrap().is_none() {
             // ya esta buscando lider
             return;
         }
+
         println!("[{}] buscando lider", self.id);
+
         *self.got_ok.0.lock().unwrap() = false;
         *self.leader_id.0.lock().unwrap() = None;
-        self.send_election();
+        self.enviar_election();
         let got_ok =
             self.got_ok
                 .1
                 .wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
+                
         if !*got_ok.unwrap().0 {
-            self.make_me_leader()
+            self.anunciarme_lider()
         } else {
             self.leader_id
                 .1
@@ -79,29 +83,31 @@ impl LeaderElection {
         }
     }
 
-    fn id_to_msg(&self, header: u8) -> Vec<u8> {
+    fn id_a_mensaje(&self, header: u8) -> Vec<u8> {
         let mut msg = vec![header];
         msg.extend_from_slice(&self.id.to_le_bytes());
         msg
     }
 
-    fn send_election(&self) {
+    fn enviar_election(&self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
-        let msg = self.id_to_msg(b'E');
+        let msg = self.id_a_mensaje(b'E');
         for peer_id in (self.id + 1)..TEAM_MEMBERS {
             self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
         }
     }
 
-    fn make_me_leader(&self) {
+    fn anunciarme_lider(&self) {
         // El nuevo coordinador se anuncia con un mensaje COORDINATOR
         println!("[{}] me anuncio como lider", self.id);
-        let msg = self.id_to_msg(b'C');
+        let msg = self.id_a_mensaje(b'C');
+
         for peer_id in 0..TEAM_MEMBERS {
             if peer_id != self.id {
                 self.socket.send_to(&msg, id_to_ctrladdr(peer_id)).unwrap();
             }
         }
+        
         *self.leader_id.0.lock().unwrap() = Some(self.id);
     }
 
@@ -113,6 +119,7 @@ impl LeaderElection {
             if *self.stop.0.lock().unwrap() {
                 break;
             }
+
             match &buf[0] {
                 b'O' => {
                     println!("[{}] recibí OK de {}", self.id, id_from);
@@ -123,10 +130,10 @@ impl LeaderElection {
                     println!("[{}] recibí Election de {}", self.id, id_from);
                     if id_from < self.id {
                         self.socket
-                            .send_to(&self.id_to_msg(b'O'), id_to_ctrladdr(id_from))
+                            .send_to(&self.id_a_mensaje(b'O'), id_to_ctrladdr(id_from))
                             .unwrap();
                         let mut me = self.clone();
-                        thread::spawn(move || me.find_new());
+                        thread::spawn(move || me.buscar_nuevo_lider());
                     }
                 }
                 b'C' => {
@@ -150,8 +157,8 @@ impl LeaderElection {
             .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
     }
 
-    fn clone(&self) -> LeaderElection {
-        LeaderElection {
+    fn clone(&self) -> EleccionLider {
+        EleccionLider {
             id: self.id,
             socket: self.socket.try_clone().unwrap(),
             leader_id: self.leader_id.clone(),

@@ -37,8 +37,6 @@ impl Parser {
         loop {
             let bytes = self.lector.read_line(&mut buffer)?;
 
-            self.posicion += 1;
-
             if bytes == 0 {
                 return Ok(None);
             }

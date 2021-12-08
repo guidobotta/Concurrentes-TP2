@@ -5,7 +5,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::{leader_election::LeaderElection, escritor_fallidos::EscritorFallidos, log::{Log, Transaccion}};
+use super::{eleccion_lider::EleccionLider, parser_fallidos::ParserFallidos, log::{Log, Transaccion}};
 use super::pago::Pago;
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
@@ -18,15 +18,14 @@ pub struct Aplicacion {
 impl Aplicacion {
     pub fn new(
         id: usize, 
-        lider: LeaderElection, 
-        parseador: Parser,
-        escritor: EscritorFallidos) -> Resultado<Aplicacion> {
+        lider: EleccionLider, 
+        parseador: Parser) -> Resultado<Aplicacion> {
         //let protocolo = Protocolo::new(Aplicacion::direccion_desde_id(id))?;
         let continuar = Arc::new(AtomicBool::new(true));
         let continuar_clonado = continuar.clone();
         Ok(Aplicacion {
             handle: thread::spawn(move || {
-                Aplicacion::procesar(id, lider, parseador, escritor, continuar_clonado)
+                Aplicacion::procesar(id, lider, parseador, continuar_clonado)
             }),
             continuar,
         })
@@ -39,14 +38,13 @@ impl Aplicacion {
 
     fn procesar(
         id: usize,
-        lider: LeaderElection,
+        lider: EleccionLider,
         mut parseador: Parser,
-        mut escritor: EscritorFallidos,
         continuar: Arc<AtomicBool>,
     ) {
     
         while continuar.load(Ordering::Relaxed) {
-            if lider.am_i_leader() {
+            if lider.soy_lider() {
                 Aplicacion::procesar_lider(&lider, &mut parseador, id);
             } else { 
                 //No somos el lider, ver que hacer para detectar caida de lider (No hacer busy waiting)
@@ -54,43 +52,38 @@ impl Aplicacion {
         }
     }
 
-    fn procesar_lider(lider: &LeaderElection, parseador: &mut Parser, id: usize) {
+    fn procesar_lider(lider: &EleccionLider, parseador: &mut Parser, id: usize) {
         let mut log = Log::new("./files/estado.log".to_string()).unwrap();
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
         let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
         let mut inicio_lider = true;
         let mut transaccion;
-        let mut prox_pago = 0;
+        let mut prox_pago = 1;
 
-        while lider.am_i_leader() {
+        while lider.soy_lider() {
             //Este if inicio_lider se puede sacar fuera del while, porque ya sabemos que es lider
             if inicio_lider {
-                //Aca obtenemos la ultima transaccion que puede o no ser un reintento
-                transaccion = log.ultima_transaccion();
-                //if transaccion.es_reintento() {
-                //    transaccion.pago = parser_fallidos.parsear(transaccion.id_pago).unwrap();
-                //    prox_pago = transaccion.id_pago_prox
-                //} else {
-                //    transaccion.pago = parseador.parsear_nuevo(Some(transaccion.id_pago)).unwrap();
-                //}
-                //let prox_pago = transaccion.id_pago_prox;
-                parseador.actualizar(transaccion.id_pago_prox);
                 inicio_lider = false;
+                transaccion = match log.ultima_transaccion() {
+                    Some(t) => t,
+                    None => continue
+                };
+                prox_pago = transaccion.id_pago_prox;
             } else if false { // !cola_reintentos.empty? { //Reintento, mensaje por socket.
                 //pago = socket.reintento();
                 transaccion = log.nueva_transaccion(prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
                 //transaccion.id_pago = pago.id;
-                transaccion.pago = parseador_fallidos.parsear(transaccion.id_pago);
+                transaccion.pago = Some(parser_fallidos.parsear_fallido(transaccion.id_pago).unwrap().unwrap());
             } else {
                 transaccion = log.nueva_transaccion(prox_pago);
-                transaccion.pago = parseador.parsear().unwrap()
+                transaccion.pago = Some(parseador.parsear_nuevo(None).unwrap().unwrap());
             }
             //Procesar transaccion
             if coordinador.submit(&mut transaccion).is_err() {
                 //Agregar a la lista de falladas
                 println!("El pago de id {} ha fallado", &transaccion.id_pago);
                 transaccion.get_pago()
-                .and_then(|p| Some(escritor.escribir_fallido(p)));
+                .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
             }
         }
     }

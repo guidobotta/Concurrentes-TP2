@@ -70,7 +70,7 @@ pub struct Log {
     archivo: File,
     log: HashMap<usize, Transaccion>,
     siguiente_id: usize,
-    ultima_trans: Transaccion
+    ultima_trans: Option<Transaccion>
 }
 
 impl Log {
@@ -88,18 +88,13 @@ impl Log {
             archivo: archivo,
             siguiente_id: 1,
             log: HashMap::new(),
-            ultima_trans: Transaccion::default(0)
+            ultima_trans: None
         };
 
         log.leer_archivo();
         
         Ok(log)
-    }
-    //log.nueva_transaccion() -> Transaccion
-    //log.ultima_transaccion() -> Transaccion
-    //log.get(Transaccion.id) -> Transaccion
-
-    
+    }    
 
     pub fn nueva_transaccion(&mut self, id_pago: usize) -> Transaccion {
         //La idea es que devuelva una transaccion semi inicializada, con el id seteado.
@@ -157,7 +152,7 @@ impl Log {
             self.log.insert(transaccion.id, transaccion);
         }
 
-        self.ultima_trans = self.log.get(&ultimo_id).unwrap().clone();
+        self.ultima_trans = Some(self.log.get(&ultimo_id).unwrap().clone());
     }
 
 
@@ -178,7 +173,7 @@ impl Log {
          Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado, reintento))
     }
 
-    pub fn ultima_transaccion(&self) -> Transaccion {
+    pub fn ultima_transaccion(&self) -> Option<Transaccion> {
         self.ultima_trans.clone()
     }
 

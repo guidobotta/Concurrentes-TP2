@@ -47,7 +47,7 @@ impl CoordinadorTransaccion {
             Some(t) => match t.estado {
                 EstadoTransaccion::Prepare => self.full_protocol(transaccion),
                 EstadoTransaccion::Commit => { self.commit(transaccion) },
-                EstadoTransaccion::Abort => { 
+                EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
                     return Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")));
                 }

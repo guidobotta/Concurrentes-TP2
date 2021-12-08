@@ -2,14 +2,13 @@ mod model;
 use model::aplicacion::Aplicacion;
 use common::error::Resultado;
 use model::escritor_fallidos::EscritorFallidos;
-use model::leader_election::LeaderElection;
+use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
 
 fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<()> {
     let parseador = Parser::new(path_pagos)?;
-    let lider = LeaderElection::new(id);
-    let escritor = EscritorFallidos::new(path_fallidos)?;
-    let aplicacion = Aplicacion::new(id, lider, parseador, escritor)?;
+    let lider = EleccionLider::new(id);
+    let aplicacion = Aplicacion::new(id, lider, parseador)?;
     let mut entrada = String::new();
     //Loopea infinitamente si la app finaliza
     loop {
