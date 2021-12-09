@@ -71,7 +71,7 @@ impl EleccionLider {
             return;
         }
 
-        println!("[{}] buscando lider", self.id);
+        println!("[ELECCION]: En busca de un lider");
 
         *self.obtuve_ok.0.lock().unwrap() = false;
         *self.id_lider.0.lock().unwrap() = None;
@@ -104,7 +104,7 @@ impl EleccionLider {
 
     fn anunciarme_lider(&mut self) {
         // El nuevo coordinador se anuncia con un mensaje COORDINATOR
-        println!("[{}] me anuncio como lider", self.id);
+        println!("[ELECCION]: Me anuncio como lider");
         let mensaje = MensajeLider::new(CodigoLider::COORDINADOR, self.id);
 
         for peer_id in 0..TEAM_MEMBERS {
@@ -126,12 +126,12 @@ impl EleccionLider {
                 // TODO: ver si pasamos las conexiones a TCP
                 match mensaje.codigo {
                     CodigoLider::OK => {
-                        println!("[ELECCION {}] recibí OK de {}", self.id, id_emisor);
+                        //println!("[ELECCION {}] recibí OK de {}", self.id, id_emisor);
                         *self.obtuve_ok.0.lock().unwrap() = true;
                         self.obtuve_ok.1.notify_all();
                     }
                     CodigoLider::ELECCION => {
-                        println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
+                        //println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
                         if id_emisor < self.id {
                             // TODO: Sacar a una función auxiliar
                             let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
@@ -142,7 +142,7 @@ impl EleccionLider {
                         }
                     }
                     CodigoLider::COORDINADOR => {
-                        println!("[ELECCION {}] recibí COORDINADOR de {}", self.id, id_emisor);
+                        println!("[ELECCION]: El nuevo lider es {}", id_emisor);
                         *self.id_lider.0.lock().unwrap() = Some(id_emisor);
                         self.id_lider.1.notify_all();
                         
@@ -150,14 +150,14 @@ impl EleccionLider {
                         thread::spawn(move || me.mantener_vivo()); // TODO: revisar esto
                     }
                     CodigoLider::VERIFICAR => {
-                        println!("[ELECCION {}] recibí VERIFICAR de {}", self.id, id_emisor);
+                        //println!("[ELECCION {}] recibí VERIFICAR de {}", self.id, id_emisor);
                         if self.soy_lider() {
                             let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
                             self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_emisor));
                         }
                     }
                     _ => {
-                        println!("[ELECCION {}] recibí algo que no puedo interpretar {}", self.id, id_emisor);
+                        println!("[ELECCION]: Recibí algo que no puedo interpretar de {}", id_emisor);
                     }
                 };
             } else {
@@ -181,7 +181,7 @@ impl EleccionLider {
         while !self.soy_lider() { // CAMBIAR LOOP INFINITO, VER COMO USAR EL STOP            
             let mensaje = MensajeLider::new(CodigoLider::VERIFICAR, self.id);
             
-            println!("[ELECCION {}] envío VERIFICAR", self.id); // TODO: TENEMOS EL IDLIDER, PODEMOS ENVIARLE SOLO A EL
+            //println!("[ELECCION {}] envío VERIFICAR", self.id); // TODO: TENEMOS EL IDLIDER, PODEMOS ENVIARLE SOLO A EL
 
             for peer_id in (self.id + 1)..TEAM_MEMBERS {
                 self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));

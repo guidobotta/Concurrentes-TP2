@@ -34,13 +34,13 @@ impl WebService {
                 CodigoMensaje::PREPARE {monto} => self.responder_prepare(mensaje, monto),
                 CodigoMensaje::COMMIT => self.responder_commit(mensaje),
                 CodigoMensaje::ABORT => self.responder_abort(mensaje),
-                _ => println!("[COORDINATOR] recibí algo que no puedo interpretar {}", mensaje.id_emisor)
+                _ => println!("[COORDINADOR]: Recibí algo que no puedo interpretar de {}", mensaje.id_emisor)
             }
         }
     }
 
     fn responder_prepare(&mut self, mensaje: Mensaje, monto: f64) {
-        println!("[COORDINATOR] recibí PREPARE de {}  para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
+        println!("[COORDINADOR]: Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
         let respuesta_ready = Mensaje::new(CodigoMensaje::READY, self.id, mensaje.id_op);
         let respuesta_commit = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
         let respuesta_abort = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
@@ -64,7 +64,7 @@ impl WebService {
     }
     
     fn responder_commit(&mut self, mensaje: Mensaje) {
-        println!("[COORDINATOR] recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
+        println!("[COORDINADOR]: Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
         let respuesta = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
 
@@ -81,7 +81,7 @@ impl WebService {
     }
     
     fn responder_abort(&mut self, mensaje: Mensaje) {
-        println!("[COORDINATOR] recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
+        println!("[COORDINATOR]: Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
         let respuesta = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
 
@@ -104,7 +104,6 @@ impl WebService {
 
     fn insertar_y_enviar(&mut self, estado: EstadoServicio, mensaje: Mensaje, id_emisor: usize) {
         self.log.insert(mensaje.id_op, estado);
-        println!("Envio {:?} a alglobo", mensaje.codigo);
         let direccion = DNS::direccion_alglobo(&id_emisor);
         let _ = self.protocolo.enviar(&mensaje, direccion); // TODO: manejar errores
     }

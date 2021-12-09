@@ -12,7 +12,6 @@ pub struct Protocolo {
 
 impl Protocolo {
     pub fn new(direccion: String) -> Resultado<Protocolo> {
-        println!("Creo un protocolo con dir {}", &direccion);
         Ok(Protocolo {
             skt: UdpSocket::bind(direccion)?,
         })

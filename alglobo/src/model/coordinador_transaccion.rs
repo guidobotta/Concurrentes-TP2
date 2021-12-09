@@ -77,7 +77,7 @@ impl CoordinadorTransaccion {
 
     fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.prepare());
-        println!("[COORDINATOR] hago prepare {}", transaccion.id);
+        println!("[COORDINADOR]: Prepare de transaccion {}", transaccion.id);
 
         let id_op = transaccion.id_pago;
         let pago = transaccion.get_pago().unwrap();
@@ -95,8 +95,7 @@ impl CoordinadorTransaccion {
 
     fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.commit());
-        println!("[COORDINATOR] hago commit {}", transaccion.id);
-
+        println!("[COORDINADOR]: Commit de transaccion {}", transaccion.id);
         let id_op = transaccion.id_pago;
 
         // Preparo los mensajes a enviar y mensaje esperado
@@ -107,7 +106,7 @@ impl CoordinadorTransaccion {
 
     fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.abort());
-        println!("[COORDINATOR] hago abort {}", transaccion.id);
+        println!("[COORDINADOR]: Abort de transaccion {}", transaccion.id);
 
         let id_op = transaccion.id_pago;
 
@@ -142,7 +141,6 @@ impl CoordinadorTransaccion {
             };
             
             if !responses.unwrap().0.iter().all(|opt| opt.as_ref().map_or(false, |r| r == &esperado)) {
-                println!("Los mensajes no coinciden");
                 return Err(ErrorApp::Interno(ErrorInterno::new("Respuesta no esperada")));
             }
             break
@@ -160,22 +158,22 @@ impl CoordinadorTransaccion {
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {        
                 CodigoMensaje::READY => {
-                    println!("[COORDINATOR] recibí READY de {}", id_emisor);
+                    //println!("[COORDINATOR] recibí READY de {}", id_emisor);
                     responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
                     responses.1.notify_all();
                 }
                 CodigoMensaje::COMMIT => {
-                    println!("[COORDINATOR] recibí COMMIT de {}", id_emisor);
+                    //println!("[COORDINATOR] recibí COMMIT de {}", id_emisor);
                     responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
                     responses.1.notify_all();
                 }
                 CodigoMensaje::ABORT => {
-                    println!("[COORDINATOR] recibí ABORT de {}", id_emisor);
+                    //println!("[COORDINATOR] recibí ABORT de {}", id_emisor);
                     responses.0.lock().unwrap()[id_emisor] = Some(mensaje);
                     responses.1.notify_all();
                 }
                 _ => {
-                    println!("[COORDINATOR] recibí algo que no puedo interpretar {}", id_emisor);
+                    println!("[COORDINADOR]: Recibí algo que no puedo interpretar de {}", id_emisor);
                 }
             }
         }
