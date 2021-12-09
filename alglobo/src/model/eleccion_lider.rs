@@ -108,21 +108,17 @@ impl EleccionLider {
         let mensaje = MensajeLider::new(CodigoLider::COORDINADOR, self.id);
 
         for peer_id in 0..TEAM_MEMBERS {
-            println!("Envio mensaje a id {}", peer_id);
             if peer_id != self.id {
                 self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
             }
         }
         
-        println!("Mira mama");
         *self.id_lider.0.lock().unwrap() = Some(self.id);
         self.id_lider.1.notify_all();
-        println!("Soy el lider {}", self.id_lider.0.lock().unwrap().unwrap());
     }
 
     fn responder(&mut self) {
         while !*self.stop.0.lock().unwrap() {
-            println!("Entro al while");
             // TODO: revisar el timeout
             if let Ok(mensaje) = self.protocolo.recibir_lider(Some(Duration::from_millis(10000))) { // <- Tolerancia a recibir un mensaje
                 let id_emisor = mensaje.id_emisor;
@@ -166,7 +162,6 @@ impl EleccionLider {
                 };
             } else {
                 // Hubo timeout, por lo tanto no recibí nada
-                println!("Hubo timeout");
                 let mut me = self.clone();
                 if !self.soy_lider() { // TODO: Posible Deadlock
                     thread::spawn(move || me.buscar_nuevo_lider()); // TODO: revisar esto

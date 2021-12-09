@@ -28,10 +28,9 @@ pub struct CoordinadorTransaccion {
 
 impl CoordinadorTransaccion {
     pub fn new(id: usize, log: Log) -> Self {
-        println!("Creo el coordinador con id {}", id);
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
-        let continuar = Arc::new(AtomicBool::new(false));
+        let continuar = Arc::new(AtomicBool::new(true));
         let ret = CoordinadorTransaccion {
             log,
             protocolo: protocolo.clone(),
@@ -56,7 +55,7 @@ impl CoordinadorTransaccion {
         match self.log.obtener(&transaccion.id) {
             None => self.full_protocol(transaccion),
             Some(t) => match t.estado {
-                EstadoTransaccion::Prepare => self.full_protocol(transaccion),
+                EstadoTransaccion::Prepare => self.abort(transaccion), //TODO: Ver esto
                 EstadoTransaccion::Commit => { self.commit(transaccion) },
                 EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
@@ -123,24 +122,32 @@ impl CoordinadorTransaccion {
     fn send_and_wait(&mut self, 
                      mensajes: Vec<Mensaje>, 
                      esperado: Mensaje) -> Resultado<()> {
-
-        let mut responses;
-        *self.responses.0.lock().unwrap() = vec![None; STAKEHOLDERS];
-
         loop {
+            let mut responses;
+            *self.responses.0.lock().unwrap() = vec![None; STAKEHOLDERS];
+        
             for (idx, mensaje) in mensajes.iter().enumerate() {
                 self.protocolo.enviar(&mensaje, self.destinatarios[idx].clone()).unwrap();
             }
-            responses = self.responses.1.wait_timeout_while(self.responses.0.lock().unwrap(), TIMEOUT, |responses| responses.iter().any(Option::is_none));
-
-            if responses.is_ok() { break; }
-            println!("[COORDINATOR] timeout {}", esperado.id_op);
+            responses = self.responses.1.wait_timeout_while(self.responses.0.lock().unwrap(), TIMEOUT, |responses| {
+                responses.iter().any(Option::is_none)
+            });
+            
+            match &responses {
+                Ok(val) if !val.1.timed_out() => {},
+                _ => {
+                    println!("[COORDINATOR] timeout {}", esperado.id_op);
+                    continue
+                }
+            };
+            
+            if !responses.unwrap().0.iter().all(|opt| opt.as_ref().map_or(false, |r| r == &esperado)) {
+                println!("Los mensajes no coinciden");
+                return Err(ErrorApp::Interno(ErrorInterno::new("Respuesta no esperada")));
+            }
+            break
         }
-        //opt.is_some() && opt.unwrap() == esperado
-        if !responses.unwrap().0.iter().all(|opt| opt.as_ref().map_or(false, |r| r == &esperado)) {
-            return Err(ErrorApp::Interno(ErrorInterno::new("Respuesta no esperada")));
-        }
-
+        
         Ok(())
     }
 
@@ -151,7 +158,6 @@ impl CoordinadorTransaccion {
         while continuar.load(Ordering::Relaxed) {
             let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
             let id_emisor = mensaje.id_emisor;
-
             match mensaje.codigo {        
                 CodigoMensaje::READY => {
                     println!("[COORDINATOR] recibí READY de {}", id_emisor);

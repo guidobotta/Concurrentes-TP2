@@ -6,7 +6,7 @@ if [ $# -eq 0 ]
     exit
 fi
 
-if [ $2 -eq "-r" ]
+if [ $2 = "-r" ]
   then
     rm alglobo/files/fallidos.csv
     rm alglobo/files/estado.log

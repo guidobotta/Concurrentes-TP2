@@ -21,6 +21,7 @@ fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<(
 }
 
 fn main() {
+    println!("NODO DE ALGLOBO");
     let path_pagos = match std::env::args().nth(1) {
         Some(path) => path,
         None => {

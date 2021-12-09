@@ -43,7 +43,6 @@ impl Aplicacion {
     ) {
     
         while continuar.load(Ordering::Relaxed) {
-            println!("Hola, soy lider? {}", lider.soy_lider());
             if lider.bloquear_si_no_soy_lider() {
                 Aplicacion::procesar_lider(&lider, &mut parseador, id);
             } else { 
@@ -53,8 +52,6 @@ impl Aplicacion {
     }
 
     fn procesar_lider(lider: &EleccionLider, parseador: &mut Parser, id: usize) {
-        println!("Llegamos a procesar_lider");
-        
         let mut log = Log::new("./files/estado.log".to_string()).unwrap();
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
         let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
@@ -80,10 +77,7 @@ impl Aplicacion {
             } else {
                 transaccion = log.nueva_transaccion(prox_pago);
                 transaccion.pago = match parseador.parsear_nuevo(Some(prox_pago)).ok() {
-                    Some(None) => {
-                        coordinador.finalizar();
-                        break;
-                    },
+                    Some(None) => break,
                     Some(p) => p,
                     _ => {panic!("Algo malo paso")}
                 };
@@ -97,5 +91,7 @@ impl Aplicacion {
                 .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
             }
         }
+
+        coordinador.finalizar();
     }
 }

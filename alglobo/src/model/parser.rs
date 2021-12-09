@@ -32,9 +32,9 @@ impl Parser {
     /// Parsea el archivo de request.
     /// Metodo bloqueante, finaliza al terminar de procesar los requests.
     pub fn parsear_nuevo(&mut self, id: Option<usize>) -> Resultado<Option<Pago>> {
-        let mut buffer = String::new();
-
+        
         loop {
+            let mut buffer = String::new();
             let bytes = self.lector.read_line(&mut buffer)?;
 
             if bytes == 0 {
@@ -48,13 +48,16 @@ impl Parser {
                 Some(value) => value,
             };
 
-            println!("[Parser] Nuevo pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
-                    &cap[1], &cap[2], &cap[3]);
+            
 
             self.posicion = cap[1].parse::<usize>().unwrap();
             if let Some(id_buscado) = id {
                 if id_buscado > self.posicion {continue}
             }
+            
+            println!("[Parser] Nuevo pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
+                    &cap[1], &cap[2], &cap[3]);
+
             //Si pasa la regex sabemos el casteo no fallara.
             let pago = Pago::new(
                 self.posicion,

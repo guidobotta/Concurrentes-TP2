@@ -19,5 +19,6 @@ fn run() {
 }
 
 fn main() {
-   run()
+    println!("WEBSERVICE");
+    run()
 }
