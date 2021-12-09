@@ -1,4 +1,4 @@
 # TP2-Concurrentes
 Trabajo Práctico 2 - Técnicas de Programación Concurrente
 
-[Link al informe](https://1drv.ms/w/s!Anz0OxkIw0Rrhg2HXy1LbeS9lIyd?e=OzTMl9)
+[Link al informe]https://fiubaar-my.sharepoint.com/:w:/g/personal/gbotta_fi_uba_ar/EWAmJT-EqqVAsJNijxv3ilMB6R3B2E2byvg_zUOsQHpZvg?e=tmpEtX)
