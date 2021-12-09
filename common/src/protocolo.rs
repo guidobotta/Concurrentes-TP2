@@ -19,6 +19,7 @@ impl Protocolo {
     }
 
     pub fn enviar(&mut self, mensaje: &Mensaje, direccion: String) -> Resultado<()> {
+        println!("Envío {:?}", mensaje.codigo);
         let mensaje = mensaje.codificar();
         self.skt.send_to(mensaje.as_bytes(), direccion)?;
         Ok(())

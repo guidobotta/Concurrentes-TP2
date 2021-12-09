@@ -4,7 +4,8 @@ use super::error::{ErrorApp, ErrorInterno, Resultado};
 pub enum CodigoLider {
     OK,
     ELECCION,
-    COORDINADOR
+    COORDINADOR,
+    VERIFICAR
 }
 
 #[derive(Clone)]
@@ -23,6 +24,7 @@ impl MensajeLider {
             CodigoLider::OK => format!("OK {}", self.id_emisor),
             CodigoLider::ELECCION => format!("ELECCION {}", self.id_emisor),
             CodigoLider::COORDINADOR => format!("COORDINADOR {}", self.id_emisor),
+            CodigoLider::VERIFICAR => format!("VERIFICAR {}", self.id_emisor),
         }
     }
 
@@ -32,6 +34,7 @@ impl MensajeLider {
             "OK" => CodigoLider::OK,
             "ELECCION" => CodigoLider::ELECCION,
             "COORDINADOR" => CodigoLider::COORDINADOR,
+            "VERIFICAR" => CodigoLider::VERIFICAR,
             _ => return Err(ErrorApp::Interno(ErrorInterno::new(&format!("Mensaje erroneo: {}", parseado[0])))),
         };
 

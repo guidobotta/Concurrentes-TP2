@@ -78,7 +78,7 @@ impl CoordinadorTransaccion {
 
     fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.prepare());
-        println!("[COORDINATOR] prepare {}", transaccion.id);
+        println!("[COORDINATOR] hago prepare {}", transaccion.id);
 
         let id_op = transaccion.id_pago;
         let pago = transaccion.get_pago().unwrap();
@@ -96,7 +96,7 @@ impl CoordinadorTransaccion {
 
     fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.commit());
-        println!("[COORDINATOR] commit {}", transaccion.id);
+        println!("[COORDINATOR] hago commit {}", transaccion.id);
 
         let id_op = transaccion.id_pago;
 
@@ -108,7 +108,7 @@ impl CoordinadorTransaccion {
 
     fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.insertar(transaccion.abort());
-        println!("[COORDINATOR] abort {}", transaccion.id);
+        println!("[COORDINATOR] hago abort {}", transaccion.id);
 
         let id_op = transaccion.id_pago;
 

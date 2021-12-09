@@ -6,7 +6,7 @@ use std::time::Duration;
 use common::dns::DNS;
 
 const TEAM_MEMBERS: usize = 5;
-const TIMEOUT: Duration = Duration::from_secs(10);
+const TIMEOUT: Duration = Duration::from_secs(8); // <- Si pasa este tiempo me hago lider
 
 pub struct EleccionLider {
     id: usize,
@@ -33,6 +33,18 @@ impl EleccionLider {
 
         ret.buscar_nuevo_lider();
         ret
+    }
+
+    pub fn bloquear_si_no_soy_lider(&self) -> bool {
+        self.id_lider
+            .1
+            .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
+                id_lider.is_none() || id_lider.unwrap() != self.id
+            })
+            .unwrap()
+            .unwrap();
+
+        true
     }
 
     pub fn soy_lider(&self) -> bool {
@@ -81,14 +93,9 @@ impl EleccionLider {
         }
     }
 
-    fn id_a_mensaje(&self, header: u8) -> Vec<u8> {
-        let mut msg = vec![header];
-        msg.extend_from_slice(&self.id.to_le_bytes());
-        msg
-    }
-
     fn enviar_eleccion(&mut self) {
         // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
+        thread::sleep(Duration::from_millis(500)); // TODO: CAMBIAR ESTO
         let mensaje = MensajeLider::new(CodigoLider::ELECCION, self.id);
         for peer_id in (self.id + 1)..TEAM_MEMBERS {
             self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
@@ -101,56 +108,95 @@ impl EleccionLider {
         let mensaje = MensajeLider::new(CodigoLider::COORDINADOR, self.id);
 
         for peer_id in 0..TEAM_MEMBERS {
+            println!("Envio mensaje a id {}", peer_id);
             if peer_id != self.id {
                 self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
             }
         }
         
+        println!("Mira mama");
         *self.id_lider.0.lock().unwrap() = Some(self.id);
+        self.id_lider.1.notify_all();
+        println!("Soy el lider {}", self.id_lider.0.lock().unwrap().unwrap());
     }
 
     fn responder(&mut self) {
         while !*self.stop.0.lock().unwrap() {
-            let mensaje = self.protocolo.recibir_lider(None).unwrap(); // TODO: revisar el timeout
-            let id_emisor = mensaje.id_emisor;
-
-            if *self.stop.0.lock().unwrap() {
-                break;
-            }
-
-            match mensaje.codigo {        
-                CodigoLider::OK => {
-                    println!("[ELECCION {}] recibí OK de {}", self.id, id_emisor);
-                    *self.obtuve_ok.0.lock().unwrap() = true;
-                    self.obtuve_ok.1.notify_all();
-                }
-                CodigoLider::ELECCION => {
-                    println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
-                    if id_emisor < self.id {
-                        // TODO: Sacar a una función auxiliar
-                        let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
-                        self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_emisor));
+            println!("Entro al while");
+            // TODO: revisar el timeout
+            if let Ok(mensaje) = self.protocolo.recibir_lider(Some(Duration::from_millis(10000))) { // <- Tolerancia a recibir un mensaje
+                let id_emisor = mensaje.id_emisor;
+                
+                // TODO: ver si pasamos las conexiones a TCP
+                match mensaje.codigo {
+                    CodigoLider::OK => {
+                        println!("[ELECCION {}] recibí OK de {}", self.id, id_emisor);
+                        *self.obtuve_ok.0.lock().unwrap() = true;
+                        self.obtuve_ok.1.notify_all();
+                    }
+                    CodigoLider::ELECCION => {
+                        println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
+                        if id_emisor < self.id {
+                            // TODO: Sacar a una función auxiliar
+                            let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
+                            self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_emisor));
+                            
+                            let mut me = self.clone();
+                            thread::spawn(move || me.buscar_nuevo_lider()); // TODO: revisar esto
+                        }
+                    }
+                    CodigoLider::COORDINADOR => {
+                        println!("[ELECCION {}] recibí COORDINADOR de {}", self.id, id_emisor);
+                        *self.id_lider.0.lock().unwrap() = Some(id_emisor);
+                        self.id_lider.1.notify_all();
                         
                         let mut me = self.clone();
-                        thread::spawn(move || me.buscar_nuevo_lider());
+                        thread::spawn(move || me.mantener_vivo()); // TODO: revisar esto
                     }
-                }
-                CodigoLider::COORDINADOR => {
-                    println!("[ELECCION {}] recibí COORDINADOR de {}", self.id, id_emisor);
-                    *self.id_lider.0.lock().unwrap() = Some(id_emisor);
-                    self.id_lider.1.notify_all();
-                }
-                _ => {
-                    println!("[ELECCION {}] recibí algo que no puedo interpretar {}", self.id, id_emisor);
+                    CodigoLider::VERIFICAR => {
+                        println!("[ELECCION {}] recibí VERIFICAR de {}", self.id, id_emisor);
+                        if self.soy_lider() {
+                            let mensaje = MensajeLider::new(CodigoLider::OK, self.id);
+                            self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_emisor));
+                        }
+                    }
+                    _ => {
+                        println!("[ELECCION {}] recibí algo que no puedo interpretar {}", self.id, id_emisor);
+                    }
+                };
+            } else {
+                // Hubo timeout, por lo tanto no recibí nada
+                println!("Hubo timeout");
+                let mut me = self.clone();
+                if !self.soy_lider() { // TODO: Posible Deadlock
+                    thread::spawn(move || me.buscar_nuevo_lider()); // TODO: revisar esto
                 }
             }
+
+            // if *self.stop.0.lock().unwrap() {
+            //     break;
+            // }
         }
 
         *self.stop.0.lock().unwrap() = false;
         self.stop.1.notify_all();
     }
 
-    fn stop(&mut self) {
+    fn mantener_vivo(&mut self) {
+        while !self.soy_lider() { // CAMBIAR LOOP INFINITO, VER COMO USAR EL STOP            
+            let mensaje = MensajeLider::new(CodigoLider::VERIFICAR, self.id);
+            
+            println!("[ELECCION {}] envío VERIFICAR", self.id); // TODO: TENEMOS EL IDLIDER, PODEMOS ENVIARLE SOLO A EL
+
+            for peer_id in (self.id + 1)..TEAM_MEMBERS {
+                self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
+            }
+
+            thread::sleep(Duration::from_millis(2000)); // TODO: revisar esto
+        }
+    }
+
+    fn stop(&mut self) { // TODO: ver si usar y donde
         *self.stop.0.lock().unwrap() = true;
         self.stop
             .1

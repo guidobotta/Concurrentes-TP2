@@ -43,7 +43,8 @@ impl Aplicacion {
     ) {
     
         while continuar.load(Ordering::Relaxed) {
-            if lider.soy_lider() {
+            println!("Hola, soy lider? {}", lider.soy_lider());
+            if lider.bloquear_si_no_soy_lider() {
                 Aplicacion::procesar_lider(&lider, &mut parseador, id);
             } else { 
                 //No somos el lider, ver que hacer para detectar caida de lider (No hacer busy waiting)

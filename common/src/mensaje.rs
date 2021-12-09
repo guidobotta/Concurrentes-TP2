@@ -1,6 +1,6 @@
 use super::error::{ErrorApp, ErrorInterno, Resultado};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum CodigoMensaje {
     PREPARE { monto: f64 },
     READY,
