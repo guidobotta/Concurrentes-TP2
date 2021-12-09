@@ -2,12 +2,15 @@ REPLICAS=$(($1 - 1))
 
 if [ $# -eq 0 ]
   then
-    echo "Usar como: ./run-ws.sh <num_rep>"
+    echo "Usar como: ./run-ws.sh <num_rep> <-r (opcional para borrar)>"
     exit
 fi
 
-rm alglobo/files/fallidos.csv
-rm alglobo/files/estado.log
+if [ $2 -eq "-r" ]
+  then
+    rm alglobo/files/fallidos.csv
+    rm alglobo/files/estado.log
+fi
 
 chmod +x 1-alglobo.sh
 chmod +x 2-webservices.sh
