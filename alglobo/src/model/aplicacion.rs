@@ -36,13 +36,11 @@ impl Aplicacion {
         while lider.bloquear_si_no_soy_lider() {
             //TODO: Ver que hacer con los errores
             if let Ok(None) = Aplicacion::procesar_lider(&lider, &mut parseador, &mut receptor, id) { 
-                println!("Antes de finalizar");
+                println!("[Aplicacion]: Finalizando...");
                 lider.finalizar();
                 break; 
             }
         }
-
-        println!("Fin en procesar");
     }
 
     fn procesar_lider(
@@ -99,9 +97,6 @@ impl Aplicacion {
                 .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
             }
         }
-
-        //println!("Fin en procesar_lider");
-        //coordinador.finalizar();
         Ok(Some(()))
     }
 

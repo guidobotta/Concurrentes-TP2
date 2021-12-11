@@ -111,7 +111,6 @@ impl Log {
         let mut transaccion = Transaccion::default(id + 1);
         transaccion.id_pago = id_pago;
         transaccion.id_pago_prox = id_pago + 1;
-        println!("Se crea una transaccion con id {}", transaccion.id);
 
         transaccion
     }

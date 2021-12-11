@@ -47,7 +47,6 @@ impl CoordinadorTransaccion {
 
     pub fn finalizar(&mut self) {
         self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
-        println!("Esperando finalizacion");
         if let Some(res) = self.respondedor.take() {let _ = res.join();}
     }
 
