@@ -15,12 +15,6 @@ pub struct Mensaje {
     pub id_op: usize
 }
 
-use std::any::type_name;
-
-fn type_of<T>(_: T) -> &'static str {
-    type_name::<T>()
-}
-
 impl Mensaje {
     pub fn new(codigo: CodigoMensaje, id_emisor: usize, id_op: usize) -> Self { 
         Self { codigo, id_emisor, id_op } 

@@ -1,22 +1,33 @@
 mod model;
 use model::aplicacion::Aplicacion;
 use common::error::Resultado;
+use model::comando::Comando;
 use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
+use std::sync::mpsc::channel;
+
 
 fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<()> {
     let parseador = Parser::new(path_pagos)?;
     let lider = EleccionLider::new(id);
-    let aplicacion = Aplicacion::new(id, lider, parseador)?;
-    let mut entrada = String::new();
-    //Loopea infinitamente si la app finaliza
+    let (enviador, receptor) = channel::<Comando>();
+    let app = Aplicacion::new(id, lider, parseador, receptor)?;
+
     loop {
+        let mut entrada = String::new();
         let _ = std::io::stdin().read_line(&mut entrada);
-        if entrada.contains("SALIR") {
-            aplicacion.finalizar();
-            break;
+        entrada = entrada.replace("\n", "");
+
+        if let Ok(comando) = Comando::decodificar(&entrada) {
+            enviador.send(comando.clone()).unwrap(); //TODO
+            if let Comando::FINALIZAR = comando { break; }
+        } else {
+            println!("[Aplicacion]: Comando no interpretado")
         }
     }
+
+    app.join();
+
     Ok(())
 }
 

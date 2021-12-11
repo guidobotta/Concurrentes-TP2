@@ -1,7 +1,7 @@
 use common::mensaje_lider::{CodigoLider, MensajeLider};
 use common::protocolo::Protocolo;
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use common::dns::DNS;
 
@@ -14,6 +14,7 @@ pub struct EleccionLider {
     id_lider: Arc<(Mutex<Option<usize>>, Condvar)>,
     obtuve_ok: Arc<(Mutex<bool>, Condvar)>,
     stop: Arc<(Mutex<bool>, Condvar)>,
+    respondedor: Option<JoinHandle<()>>
 }
 
 impl EleccionLider {
@@ -26,10 +27,11 @@ impl EleccionLider {
             id_lider: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             obtuve_ok: Arc::new((Mutex::new(false), Condvar::new())),
             stop: Arc::new((Mutex::new(false), Condvar::new())),
+            respondedor: None
         };
 
         let mut clone = ret.clone();
-        thread::spawn(move || clone.responder());
+        ret.respondedor = Some(thread::spawn(move || clone.responder()));
 
         ret.buscar_nuevo_lider();
         ret
@@ -59,6 +61,15 @@ impl EleccionLider {
             })
             .unwrap()
             .unwrap()
+    }
+
+    pub fn notificar_finalizacion(&mut self) {
+        let mensaje = MensajeLider::new(CodigoLider::ELECCION, self.id);
+        for peer_id in 0..TEAM_MEMBERS {
+            if peer_id != self.id {
+                let _ = self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&peer_id));
+            } 
+        }
     }
 
     pub fn buscar_nuevo_lider(&mut self) {
@@ -191,20 +202,24 @@ impl EleccionLider {
         }
     }
 
-    fn stop(&mut self) { // TODO: ver si usar y donde
+    pub fn finalizar(&mut self) { // TODO: ver si usar y donde
+        self.notificar_finalizacion();
         *self.stop.0.lock().unwrap() = true;
-        self.stop
-            .1
-            .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
+        // TODO: Ver si este codigo comentado es necesario.
+        //self.stop
+        //    .1
+        //    .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
+        if let Some(res) = self.respondedor.take() { let _ = res.join(); }
     }
 
-    fn clone(&self) -> EleccionLider {
+    pub fn clone(&self) -> EleccionLider {
         EleccionLider {
             id: self.id,
             protocolo: self.protocolo.clone(),
             id_lider: self.id_lider.clone(),
             obtuve_ok: self.obtuve_ok.clone(),
             stop: self.stop.clone(),
+            respondedor: None
         }
     }
 }

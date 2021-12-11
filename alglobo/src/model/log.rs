@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Write, BufReader};
+use std::sync::Arc;
 use common::error::Resultado;
 use regex::Regex;
 use std::io::{prelude::*};
@@ -65,6 +66,12 @@ impl Transaccion {
     }
 }
 
+
+//TODOOOOOOOOOO: HAY QUE METERLE UN LOCK A TODO EL LOG O A EL HASH Y ULTIMA_TRANS PORQUE SE ESTAN COPIANDO AL CLONAR
+//ESTO HACE QUE NO SE TENGA REFERENCIA EN MEMORIA DE LAS TRANSACCIONES INSERTADAS (LO IDEAL SERIA METERLE UN LOCK A TODO EL LOG)
+
+
+
 /// Representa un log system.
 pub struct Log {
     archivo: File,
@@ -97,14 +104,14 @@ impl Log {
         Ok(log)
     }    
 
-    pub fn nueva_transaccion(&mut self, id_pago: usize) -> Transaccion {
+    pub fn nueva_transaccion(&self, id_pago: usize) -> Transaccion {
         //La idea es que devuelva una transaccion semi inicializada, con el id seteado.
         //Luego habra que cargarle los demas campos
-        self.siguiente_id += 1;
-        
-        let mut transaccion = Transaccion::default(self.siguiente_id - 1);
+        let id = self.ultima_trans.as_ref().and_then(|t| Some(t.id)).unwrap_or(0);
+        let mut transaccion = Transaccion::default(id + 1);
         transaccion.id_pago = id_pago;
         transaccion.id_pago_prox = id_pago + 1;
+        println!("Se crea una transaccion con id {}", transaccion.id);
 
         transaccion
     }
@@ -120,6 +127,7 @@ impl Log {
         let salida = self.formatear_transaccion(transaccion);
         self.log.insert(transaccion.id, transaccion.clone());
         writeln!(self.archivo, "{}", salida).unwrap();
+        self.ultima_trans = Some(transaccion.clone());
     }
 
     fn formatear_transaccion(&self, t: &Transaccion) -> String {

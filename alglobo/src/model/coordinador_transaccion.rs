@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::thread::JoinHandle;
 use std::{thread};
 use std::time::Duration;
@@ -10,24 +10,24 @@ use common::mensaje::{Mensaje, CodigoMensaje};
 use common::dns::DNS;
 
 const STAKEHOLDERS: usize = 3;
-const TIMEOUT: Duration = Duration::from_secs(10);
+const TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TransactionId(u32);
 
 
 pub struct CoordinadorTransaccion {
-    log: Log,
+    log: Arc<RwLock<Log>>,
     protocolo: Protocolo,
     responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
     id: usize,
     destinatarios: Vec<String>,
     continuar: Arc<AtomicBool>,
-    respondedor: JoinHandle<()>
+    respondedor: Option<JoinHandle<()>>
 }
 
 impl CoordinadorTransaccion {
-    pub fn new(id: usize, log: Log) -> Self {
+    pub fn new(id: usize, log: Arc<RwLock<Log>>) -> Self {
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
         let continuar = Arc::new(AtomicBool::new(true));
@@ -38,24 +38,25 @@ impl CoordinadorTransaccion {
             id,
             destinatarios: vec![0, 1, 2].iter().map(|id| DNS::direccion_webservice(&id)).collect(), // TODO: cambiar esto
             continuar: continuar.clone(),
-            respondedor: thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses, continuar))
+            respondedor: Some(thread::spawn(move || CoordinadorTransaccion::responder(protocolo, responses, continuar)))
         };
 
 
         ret
     }
 
-    pub fn finalizar(self) {
+    pub fn finalizar(&mut self) {
         self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
-        //self.protocolo.finalizar();
-        let _ = self.respondedor.join();
+        println!("Esperando finalizacion");
+        if let Some(res) = self.respondedor.take() {let _ = res.join();}
     }
 
     pub fn submit(&mut self, transaccion: &mut Transaccion) -> Resultado<()>{
-        match self.log.obtener(&transaccion.id) {
+        let trans_en_log = self.log.read().unwrap().obtener(&transaccion.id);
+        match trans_en_log {
             None => self.full_protocol(transaccion),
             Some(t) => match t.estado {
-                EstadoTransaccion::Prepare => self.abort(transaccion), //TODO: Ver esto
+                EstadoTransaccion::Prepare => self.full_protocol(transaccion), //TODO: Ver esto
                 EstadoTransaccion::Commit => { self.commit(transaccion) },
                 EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
@@ -76,10 +77,10 @@ impl CoordinadorTransaccion {
     }
 
     fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
-        self.log.insertar(transaccion.prepare());
+        self.log.write().unwrap().insertar(transaccion.prepare());
         println!("[COORDINADOR]: Prepare de transaccion {}", transaccion.id);
 
-        let id_op = transaccion.id_pago;
+        let id_op = transaccion.id;
         let pago = transaccion.get_pago().unwrap();
         //TODO: Hay que cambiar en el Mensaje el id_op por id_transaccion, sino no vamos a poder reintentar.
         // Preparo los mensajes a enviar
@@ -94,9 +95,9 @@ impl CoordinadorTransaccion {
     }
 
     fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
-        self.log.insertar(transaccion.commit());
+        self.log.write().unwrap().insertar(transaccion.commit());
         println!("[COORDINADOR]: Commit de transaccion {}", transaccion.id);
-        let id_op = transaccion.id_pago;
+        let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
@@ -105,10 +106,10 @@ impl CoordinadorTransaccion {
     }
 
     fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
-        self.log.insertar(transaccion.abort());
+        self.log.write().unwrap().insertar(transaccion.abort());
         println!("[COORDINADOR]: Abort de transaccion {}", transaccion.id);
 
-        let id_op = transaccion.id_pago;
+        let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = Mensaje::new(CodigoMensaje::ABORT, self.id, id_op);
@@ -135,7 +136,7 @@ impl CoordinadorTransaccion {
             match &responses {
                 Ok(val) if !val.1.timed_out() => {},
                 _ => {
-                    println!("[COORDINATOR] timeout {}", esperado.id_op);
+                    println!("[COORDINADOR] Timeout {}", esperado.id_op);
                     continue
                 }
             };
@@ -154,7 +155,10 @@ impl CoordinadorTransaccion {
                 continuar: Arc<AtomicBool>) {
 
         while continuar.load(Ordering::Relaxed) {
-            let mensaje = protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
+            let mensaje = match protocolo.recibir(Some(TIMEOUT)) {
+                Ok(m) => m,
+                Err(_) => continue
+            }; // TODO: Revisar si hacer esto es correcto
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {        
                 CodigoMensaje::READY => {
@@ -177,5 +181,12 @@ impl CoordinadorTransaccion {
                 }
             }
         }
+    }
+}
+
+
+impl Drop for CoordinadorTransaccion {
+    fn drop(&mut self) {
+        self.finalizar();
     }
 }

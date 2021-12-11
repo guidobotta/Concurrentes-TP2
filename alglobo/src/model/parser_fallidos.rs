@@ -40,6 +40,8 @@ impl ParserFallidos {
             };
 
             if cap[1].parse::<usize>()? == id {
+                println!("[Parser Fallidos] Reintento de pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
+                    &cap[1], &cap[2], &cap[3]);
                 return Ok(Some(Pago::new(
                     cap[1].parse::<usize>().unwrap(),
                     cap[2].parse::<f64>().unwrap(),
