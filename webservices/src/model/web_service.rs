@@ -34,18 +34,18 @@ impl WebService {
                 CodigoMensaje::PREPARE {monto} => self.responder_prepare(mensaje, monto),
                 CodigoMensaje::COMMIT => self.responder_commit(mensaje),
                 CodigoMensaje::ABORT => self.responder_abort(mensaje),
-                _ => println!("[COORDINADOR]: Recibí algo que no puedo interpretar de {}", mensaje.id_emisor)
+                _ => println!("[WEBSERVICE] Recibí algo que no puedo interpretar de {}", mensaje.id_emisor)
             }
         }
     }
 
     fn responder_prepare(&mut self, mensaje: Mensaje, monto: f64) {
-        println!("[COORDINADOR]: Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
+        println!("[WEBSERVICE] Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
         let respuesta_ready = Mensaje::new(CodigoMensaje::READY, self.id, mensaje.id_op);
         let respuesta_commit = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
         let respuesta_abort = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
 
-        if let Some(estado) = self.log.get(&mensaje.id_op) { // TODO: cuidado con el id_op cuando se quiera reintentar va a fallar
+        if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
                 EstadoServicio::Ready => self.insertar_y_enviar(EstadoServicio::Ready, respuesta_ready, mensaje.id_emisor),
                 EstadoServicio::Commit => self.insertar_y_enviar(EstadoServicio::Commit, respuesta_commit, mensaje.id_emisor),
@@ -64,34 +64,34 @@ impl WebService {
     }
     
     fn responder_commit(&mut self, mensaje: Mensaje) {
-        println!("[COORDINADOR]: Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
+        println!("[WEBSERVICE] Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
         let respuesta = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
 
-        if let Some(estado) = self.log.get(&mensaje.id_op) { // TODO: cuidado con el id_op cuando se quiera reintentar va a fallar
+        if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
                 EstadoServicio::Ready => {
                     self.simular_trabajo();
                     self.insertar_y_enviar(EstadoServicio::Commit, respuesta, mensaje.id_emisor);
                 },
                 EstadoServicio::Commit => self.insertar_y_enviar(EstadoServicio::Commit, respuesta, mensaje.id_emisor),
-                EstadoServicio::Abort => println!("Error inesperado: llego commit con estado abort")
+                EstadoServicio::Abort => println!("[WEBSERVICE] Error inesperado: llego commit con estado abort")
             }
         };
     }
     
     fn responder_abort(&mut self, mensaje: Mensaje) {
-        println!("[COORDINATOR]: Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
+        println!("[WEBSERVICE] Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
         let respuesta = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
 
-        if let Some(estado) = self.log.get(&mensaje.id_op) { // TODO: cuidado con el id_op cuando se quiera reintentar va a fallar
+        if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
                 EstadoServicio::Ready => {
                     self.simular_trabajo();
                     self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor);
                 },
-                EstadoServicio::Commit => println!("Error inesperado: llego abort con estado commit"),
+                EstadoServicio::Commit => println!("[WEBSERVICE] Error inesperado: llego abort con estado commit"),
                 EstadoServicio::Abort => self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor)
             }
 
@@ -105,7 +105,10 @@ impl WebService {
     fn insertar_y_enviar(&mut self, estado: EstadoServicio, mensaje: Mensaje, id_emisor: usize) {
         self.log.insert(mensaje.id_op, estado);
         let direccion = DNS::direccion_alglobo(&id_emisor);
-        let _ = self.protocolo.enviar(&mensaje, direccion); // TODO: manejar errores
+
+        println!("[WEBSERVICE] Envío {:?} a {}", mensaje.codigo, id_emisor);
+        let enviado = self.protocolo.enviar(&mensaje, direccion);
+        if enviado.is_err() { println!("[WEBSERVICE] Error: Fallo al enviar mensaje") }
     }
 
     fn simular_trabajo(&self) {
