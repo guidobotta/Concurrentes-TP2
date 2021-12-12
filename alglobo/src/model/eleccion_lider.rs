@@ -8,7 +8,9 @@ use std::time::Duration;
 use common::dns::DNS;
 
 const TEAM_MEMBERS: usize = 5;
-const TIMEOUT: Duration = Duration::from_secs(8); // <- Si pasa este tiempo me hago lider
+const TIMEOUT_LIDER: Duration = Duration::from_secs(6); // <- Si pasa este tiempo me hago lider
+const TIMEOUT_MENSAJE: Duration = Duration::from_secs(10); // <- Tolerancia a recibir un mensaje
+const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); // <- Frecuencia de enviado del keep alive
 
 pub struct EleccionLider {
     id: usize,
@@ -88,7 +90,7 @@ impl EleccionLider {
         let obtuve_ok =
             self.obtuve_ok
                 .1
-                .wait_timeout_while(self.obtuve_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it);
+                .wait_timeout_while(self.obtuve_ok.0.lock().unwrap(), TIMEOUT_LIDER, |got_it| !*got_it);
                 
         if !*obtuve_ok.unwrap().0 {
             self.anunciarme_lider()
@@ -99,16 +101,11 @@ impl EleccionLider {
         }
     }
 
-    pub fn finalizar(&mut self) { // TODO: ver si usar y donde
+    pub fn finalizar(&mut self) {
         *self.stop.0.lock().unwrap() = true;
         self.notificar_finalizacion();
-        // TODO: Ver si este codigo comentado es necesario.
-        //self.stop
-        //    .1
-        //    .wait_while(self.stop.0.lock().unwrap(), |should_stop| *should_stop);
         if let Some(res) = self.respondedor.take() { let _ = res.join(); }
     }
-
 
     ////////////////////////////////////////////////////////////////////
     //                                                                //
@@ -122,13 +119,11 @@ impl EleccionLider {
     }
 
     fn enviar_eleccion(&mut self) {
-        // P envía el mensaje ELECTION a todos los procesos que tengan número mayor
         thread::sleep(Duration::from_millis(500)); // TODO: CAMBIAR ESTO
         ((self.id + 1)..TEAM_MEMBERS).for_each(|id| self.enviar(CodigoLider::ELECCION, id).unwrap());
     }
 
     fn anunciarme_lider(&mut self) {
-        // El nuevo coordinador se anuncia con un mensaje COORDINATOR
         println!("[ELECCION]: Me anuncio como lider");
         (0..TEAM_MEMBERS).for_each(|id| if id != self.id {self.enviar(CodigoLider::COORDINADOR, id).unwrap()});
 
@@ -140,7 +135,7 @@ impl EleccionLider {
         let mut threads = Vec::new();
         while !*self.stop.0.lock().unwrap() {
             // TODO: revisar el timeout
-            if let Ok(mensaje) = self.protocolo.recibir_lider(Some(Duration::from_millis(10000))) { // <- Tolerancia a recibir un mensaje
+            if let Ok(mensaje) = self.protocolo.recibir_lider(Some(TIMEOUT_MENSAJE)) {
                 let id_emisor = mensaje.id_emisor;                
                 match mensaje.codigo {
                     CodigoLider::OK => self.recibir_ok(),
@@ -192,10 +187,10 @@ impl EleccionLider {
     }
 
     fn mantener_vivo(&mut self) {
-        while !self.soy_lider() { // CAMBIAR LOOP INFINITO, VER COMO USAR EL STOP            
-            ((self.id + 1)..TEAM_MEMBERS).for_each(|id| self.enviar(CodigoLider::VERIFICAR, id).unwrap());
-
-            thread::sleep(Duration::from_millis(2000)); // TODO: revisar esto
+        while !self.soy_lider() {         
+            if self.enviar(CodigoLider::VERIFICAR, self.get_id_lider()).is_ok() {
+                thread::sleep(TIMEOUT_MANTENER_VIVO);
+            };
         }
     }
 

@@ -25,7 +25,9 @@ impl Protocolo {
 
     pub fn recibir(&mut self, timeout: Option<Duration>) -> Resultado<Mensaje> {
         let mut buffer = vec![0; TAM_BUFFER];
-        self.skt.set_read_timeout(timeout); // TODO: manejar resultado
+        if self.skt.set_read_timeout(timeout).is_err() {
+            return Err(ErrorApp::Interno(ErrorInterno::new("Error al setear timeout")));
+        };
         let (recibido, src) = self.skt.recv_from(&mut buffer)?;
 
         if recibido == 0 {
@@ -42,7 +44,9 @@ impl Protocolo {
 
     pub fn recibir_lider(&mut self, timeout: Option<Duration>) -> Resultado<MensajeLider> {
         let mut buffer = vec![0; TAM_BUFFER];
-        self.skt.set_read_timeout(timeout); // TODO: manejar resultado
+        if self.skt.set_read_timeout(timeout).is_err() {
+            return Err(ErrorApp::Interno(ErrorInterno::new("Error al setear timeout")));
+        };
         let (recibido, src) = self.skt.recv_from(&mut buffer)?;
 
         if recibido == 0 {
