@@ -22,13 +22,12 @@ pub struct Transaccion {
     pub id_pago: usize,
     pub id_pago_prox: usize,
     pub estado: EstadoTransaccion,
-    pub reintento: bool,
     pub pago: Option<Pago>
 }
 
 impl Transaccion {
-    pub fn new(id: usize, id_pago: usize, id_pago_prox: usize, estado: EstadoTransaccion, reintento: bool) -> Self {
-        Self { id, id_pago, id_pago_prox, estado, reintento, pago: None }
+    pub fn new(id: usize, id_pago: usize, id_pago_prox: usize, estado: EstadoTransaccion) -> Self {
+        Self { id, id_pago, id_pago_prox, estado, pago: None }
     }
 
     pub fn default(id: usize) -> Self { 
@@ -37,7 +36,6 @@ impl Transaccion {
             id_pago: 0, 
             id_pago_prox: 0, 
             estado: EstadoTransaccion::Prepare, 
-            reintento: false, 
             pago: None
         } 
     }
@@ -59,10 +57,6 @@ impl Transaccion {
     pub fn abort(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Abort;
         self
-    }
-
-    pub fn es_reintento(&self) -> bool {
-        self.reintento
     }
 }
 
@@ -130,9 +124,7 @@ impl Log {
             EstadoTransaccion::Prepare => "PREPARE"
         };
 
-        let tipo = if t.es_reintento() { "R" } else { "N" };
-
-        format!("{},{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado, tipo)
+        format!("{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado)
     }
 
     fn leer_archivo(&mut self) {
@@ -162,7 +154,6 @@ impl Log {
         let pago_id = argumentos[2].parse::<usize>()?;
         let prox_pago_id = argumentos[3].parse::<usize>()?;
         let operacion = &argumentos[4];
-        let reintento = &argumentos[5] == "R";
         
         let estado = match operacion {
              "COMMIT" => EstadoTransaccion::Commit,
@@ -171,7 +162,7 @@ impl Log {
              _ => panic!("Estado erroneo")
         };
 
-         Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado, reintento))
+         Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado))
     }
 
     pub fn ultima_transaccion(&self) -> Option<Transaccion> {

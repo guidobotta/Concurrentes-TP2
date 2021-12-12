@@ -116,7 +116,7 @@ impl WebService {
     
     fn simular_resultado(&self) -> Result<(), ()> {
         let mut rng = rand::thread_rng();
-        let ok = rng.gen::<f32>() >= 0.1; // TODO: env
+        let ok = rng.gen::<f32>() >= 0.2; // TODO: env
     
         if ok { Ok(()) } else { Err(()) }
     }
