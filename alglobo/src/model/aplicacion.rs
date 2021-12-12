@@ -1,17 +1,22 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
+use std::sync::{,
     Arc, RwLock,
 };
 use std::thread::{self, JoinHandle};
 
 use common::error::Resultado;
-use super::{eleccion_lider::EleccionLider, parser_fallidos::ParserFallidos, log::Log, comando::Comando};
+use super::{eleccion_lider::EleccionLider, parser_fallidos::ParserFallidos, log::{Log, Transaccion}, comando::Comando};
 use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
 use std::sync::mpsc::Receiver;
 
 pub struct Aplicacion {
     handle: JoinHandle<()>
+}
+
+pub enum EstadoApp {
+    FinEntrada,
+    CambioLider,
+    Finalizar
 }
 
 impl Aplicacion {
@@ -32,13 +37,30 @@ impl Aplicacion {
         mut lider: EleccionLider,
         mut parseador: Parser,
         mut receptor: Receiver<Comando>
-    ) {
+    ) { 
+
+        let mut estado = EstadoApp::CambioLider;
+
         while lider.bloquear_si_no_soy_lider() {
             //TODO: Ver que hacer con los errores
-            if let Ok(None) = Aplicacion::procesar_lider(&lider, &mut parseador, &mut receptor, id) { 
-                println!("[Aplicacion]: Finalizando...");
-                lider.finalizar();
-                break; 
+            match estado {
+                EstadoApp::CambioLider => {
+                    match Aplicacion::procesar_lider(&lider, &mut parseador, &mut receptor, id) {
+                        Ok(r) => {estado = r},
+                        Err(e) => println!("{}", e)
+                    }
+                },
+                EstadoApp::FinEntrada => {
+                    match Aplicacion::procesar_fallidos(&lider, &mut receptor, id) {
+                        Ok(r) => {estado = r},
+                        Err(e) => println!("{}", e)
+                    }
+                },
+                EstadoApp::Finalizar => {
+                    println!("[Aplicacion]: Finalizando...");
+                    lider.finalizar();
+                    break;
+                }
             }
         }
     }
@@ -47,7 +69,7 @@ impl Aplicacion {
         lider: &EleccionLider, 
         parseador: &mut Parser, 
         receptor: &mut Receiver<Comando>, 
-        id: usize) -> Resultado<Option<()>> {
+        id: usize) -> Resultado<EstadoApp> {
 
         let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string()).unwrap()));
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
@@ -72,18 +94,17 @@ impl Aplicacion {
                 };
             } else if let Ok(comando) = receptor.try_recv() {
                 let id_reintento = match comando {
-                    Comando::FINALIZAR => return Ok(None),
+                    Comando::FINALIZAR => return Ok(EstadoApp::Finalizar),
                     Comando::REINTENTAR {id} => id
                 };
-                println!("[Aplicacion]: Se reintenta el pago de id {}", id_reintento);
-                transaccion = log.read().unwrap().nueva_transaccion(prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
-                transaccion.id_pago = id_reintento;
-                transaccion.id_pago_prox = prox_pago;
-                transaccion.pago = Some(parser_fallidos.parsear_fallido(id_reintento).unwrap().unwrap());
+                transaccion = match Aplicacion::procesar_comando(id_reintento, &mut parser_fallidos, &mut log, prox_pago) {
+                    Ok(Some(t)) => t,
+                    _ => continue 
+                };
             } else {
                 transaccion = log.read().unwrap().nueva_transaccion(prox_pago);
                 transaccion.pago = match parseador.parsear_nuevo(Some(prox_pago)).ok() {
-                    Some(None) => return Ok(None),
+                    Some(None) => return Ok(EstadoApp::FinEntrada),
                     Some(p) => p,
                     _ => {panic!("Algo malo paso")}
                 };
@@ -97,9 +118,73 @@ impl Aplicacion {
                 .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
             }
         }
-        Ok(Some(()))
+
+        Ok(EstadoApp::CambioLider)
     }
 
+
+    fn procesar_comando(id_reintento: usize, 
+                        parser: &mut ParserFallidos,
+                        log: &mut Arc<RwLock<Log>>,
+                        prox_pago: usize) -> Resultado<Option<Transaccion>>{
+                            
+        let mut transaccion = log.read().unwrap().nueva_transaccion(prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
+        transaccion.id_pago = id_reintento;
+        transaccion.id_pago_prox = prox_pago;
+
+        match parser.parsear_fallido(id_reintento) {
+            Ok(Some(pago)) => {
+                println!("[Aplicacion]: Se reintenta el pago de id {}", id_reintento);
+                transaccion.pago = Some(pago)
+            },
+            Ok(None) => {
+                println!("[Aplicacion]: Error, no se encontró el pago de id {} en el archivo de fallidos", id_reintento);
+                return Ok(None)
+            },
+            Err(e) => {
+                println!("{}", e);
+                return Err(e)
+            }
+        };
+
+        Ok(Some(transaccion))
+    }
+
+    fn procesar_fallidos(
+        lider: &EleccionLider,
+        receptor: &mut Receiver<Comando>, 
+        id: usize) -> Resultado<EstadoApp> {
+
+        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string()).unwrap()));
+        let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
+        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
+        let mut transaccion;
+        let prox_pago = log.read().unwrap()
+                                            .ultima_transaccion()
+                                            .and_then(|t| Some(t.id_pago_prox))
+                                            .unwrap_or(1);
+        
+        while lider.soy_lider() {
+            if let Ok(comando) = receptor.recv() {
+                let id_reintento = match comando {
+                    Comando::FINALIZAR => return Ok(EstadoApp::Finalizar),
+                    Comando::REINTENTAR {id} => id
+                };
+                transaccion = match Aplicacion::procesar_comando(id_reintento, &mut parser_fallidos, &mut log, prox_pago) {
+                    Ok(Some(t)) => t,
+                    _ => continue 
+                };
+                if coordinador.submit(&mut transaccion).is_err() {
+                    //Agregar a la lista de falladas
+                    println!("[APLICACION]: El pago de id {} ha fallado", &transaccion.id_pago);
+                    transaccion.get_pago()
+                    .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
+                }
+            }
+        }
+
+        Ok(EstadoApp::CambioLider)
+    }
 
     pub fn join(self) {
         let _ = self.handle.join();
