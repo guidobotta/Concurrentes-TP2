@@ -9,10 +9,12 @@ use super::parser::Parser;
 use super::coordinador_transaccion::CoordinadorTransaccion;
 use std::sync::mpsc::Receiver;
 
+/// Aplicacion implementa el flujo principal de un nodo lider de alglobo.
 pub struct Aplicacion {
     handle: JoinHandle<()>
 }
 
+// TODO: Documentacion
 pub enum EstadoApp {
     FinEntrada,
     CambioLider,
@@ -20,6 +22,7 @@ pub enum EstadoApp {
 }
 
 impl Aplicacion {
+    // TODO: Documentacion
     pub fn new(
         id: usize, 
         lider: EleccionLider, 
@@ -32,6 +35,7 @@ impl Aplicacion {
         })
     }
 
+    // TODO: Documentacion?? Es privada
     fn procesar(
         id: usize,
         mut lider: EleccionLider,
@@ -65,6 +69,7 @@ impl Aplicacion {
         }
     }
 
+    // TODO: Documentacion?? Es privada
     fn procesar_lider(
         lider: &EleccionLider, 
         parseador: &mut Parser, 
@@ -122,6 +127,7 @@ impl Aplicacion {
         Ok(EstadoApp::CambioLider)
     }
 
+    // TODO: Documentacion?? Es privada
     fn procesar_fallidos(
         lider: &EleccionLider,
         receptor: &mut Receiver<Comando>, 
@@ -158,7 +164,7 @@ impl Aplicacion {
         Ok(EstadoApp::CambioLider)
     }
 
-
+    // TODO: Documentacion?? Es privada
     fn procesar_comando(id_reintento: usize, 
                         parser: &mut ParserFallidos,
                         log: &Arc<RwLock<Log>>,
@@ -186,6 +192,7 @@ impl Aplicacion {
         Ok(Some(transaccion))
     }
 
+    // TODO: Documentacion
     pub fn join(self) {
         let _ = self.handle.join();
     }

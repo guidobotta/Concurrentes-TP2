@@ -1,5 +1,6 @@
 use common::error::{ErrorApp, ErrorInterno, Resultado};
 
+// TODO: Documentacion
 #[derive(Clone, PartialEq, Debug)]
 pub enum Comando {
     REINTENTAR { id: usize },
@@ -7,7 +8,7 @@ pub enum Comando {
 }
 
 impl Comando {
-
+    // TODO: Documentacion
     pub fn decodificar(mensaje_codificado: &String) -> Resultado<Comando> {
         let parseado = mensaje_codificado.split(' ').collect::<Vec<&str>>();
         match parseado[0] {

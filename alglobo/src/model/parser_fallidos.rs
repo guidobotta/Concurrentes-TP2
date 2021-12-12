@@ -7,15 +7,16 @@ use std::{
 };
 use super::pago::Pago;
 
-/// Representa un log system.
+/// ParserFallidos implementa el parseo de los request fallidos que se
+/// encuentran en un archivo dado.
 pub struct ParserFallidos {
     archivo: File,
     matcher: Regex,
 }
 
 impl ParserFallidos {
-    /// Genera una instancia de la clase.
-    /// Recibe un path donde dicho archivo debe ser construido.
+    /// Devuelve una instancia de ParserFallidos.
+    /// Recibe la ruta del archivo a ser procesado.
     pub fn new(path: String) -> Resultado<Self> {
         Ok(ParserFallidos {
             archivo: fs::OpenOptions::new()
@@ -28,6 +29,7 @@ impl ParserFallidos {
         })
     }
 
+    // TODO: Documentacion
     pub fn parsear_fallido(&mut self, id: usize) -> Resultado<Option<Pago>> {
         self.archivo.seek(io::SeekFrom::Start(0))?;
         let lector = io::BufReader::new(&self.archivo);
@@ -61,6 +63,7 @@ impl ParserFallidos {
         Ok(pago)
     }
 
+    // TODO: Documentacion
     pub fn escribir_fallido(&mut self, pago: Pago) {
         self.archivo.seek(io::SeekFrom::End(0));
         let salida = self.formatear_pago(pago);
@@ -74,6 +77,7 @@ impl ParserFallidos {
         }
     }
     
+    // TODO: Documentacion?? Es privada
     fn formatear_pago(&self, pago: Pago) -> String {
         format!("{},{:.2},{:.2}", pago.get_id(), pago.get_monto_aerolinea(), pago.get_monto_hotel())
     }

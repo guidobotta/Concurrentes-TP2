@@ -6,7 +6,6 @@ use std::num::{ParseIntError, ParseFloatError};
 use std::string::FromUtf8Error;
 
 /// Clase utilizada para manejar error internos del sistema
-
 #[derive(Debug)]
 pub struct ErrorInterno {
     mensaje: String,

@@ -15,7 +15,8 @@ const TIMEOUT: Duration = Duration::from_secs(2);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TransactionId(u32);
 
-
+/// CoordinadorTransaccion implementa el manejo de transacciones a través del
+/// envío y recepción de mensajes con los distintos webservices.
 pub struct CoordinadorTransaccion {
     log: Arc<RwLock<Log>>,
     protocolo: Protocolo,
@@ -27,6 +28,8 @@ pub struct CoordinadorTransaccion {
 }
 
 impl CoordinadorTransaccion {
+    /// Devuelve una instancia de CoordinadorTransaccion.
+    /// Recibe el id asociado al nodo de alglobo y un Log.
     pub fn new(id: usize, log: Arc<RwLock<Log>>) -> Self {
         let protocolo = Protocolo::new(DNS::direccion_alglobo(&id)).unwrap();
         let responses =  Arc::new((Mutex::new(vec![None; STAKEHOLDERS]), Condvar::new()));
@@ -45,11 +48,13 @@ impl CoordinadorTransaccion {
         ret
     }
 
+    // TODO: Documentacion
     pub fn finalizar(&mut self) {
         self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
         if let Some(res) = self.respondedor.take() {let _ = res.join();}
     }
 
+    // TODO: Documentacion
     pub fn submit(&mut self, transaccion: &mut Transaccion) -> Resultado<()>{
         let trans_en_log = self.log.read().unwrap().obtener(&transaccion.id);
         match trans_en_log {
@@ -65,6 +70,7 @@ impl CoordinadorTransaccion {
         }
     }
 
+    // TODO: Documentacion?? Es privada
     fn full_protocol(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         match self.prepare(transaccion) {
             Ok(_) => { self.commit(transaccion) }, // TODO: ver que hacer con el result de estos (quizas reintentar commit)
@@ -75,6 +81,7 @@ impl CoordinadorTransaccion {
         }
     }
 
+    // TODO: Documentacion?? Es privada
     fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.write().unwrap().insertar(transaccion.prepare());
         println!("[COORDINADOR]: Prepare de transaccion {}", transaccion.id);
@@ -93,6 +100,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
     }
 
+    // TODO: Documentacion?? Es privada
     fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.write().unwrap().insertar(transaccion.commit());
         println!("[COORDINADOR]: Commit de transaccion {}", transaccion.id);
@@ -104,6 +112,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
+    // TODO: Documentacion?? Es privada
     fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log.write().unwrap().insertar(transaccion.abort());
         println!("[COORDINADOR]: Abort de transaccion {}", transaccion.id);
@@ -116,6 +125,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
 
+    // TODO: Documentacion?? Es privada
     //Queremos que se encargue de enviarle los mensajes a los destinatarios
     //y espere por sus respuestas, con un timeout y numero de intentos dado
     fn send_and_wait(&mut self, 
@@ -149,6 +159,7 @@ impl CoordinadorTransaccion {
         Ok(())
     }
 
+    // TODO: Documentacion?? Es privada
     fn responder(mut protocolo: Protocolo, 
                 responses: Arc<(Mutex<Vec<Option<Mensaje>>>, Condvar)>,
                 continuar: Arc<AtomicBool>) {
@@ -183,7 +194,7 @@ impl CoordinadorTransaccion {
     }
 }
 
-
+// TODO: Documentacion
 impl Drop for CoordinadorTransaccion {
     fn drop(&mut self) {
         self.finalizar();

@@ -2,7 +2,8 @@ use common::error::Resultado;
 use super::pago::Pago;
 use regex::Regex;
 
-/// Clase utilizada para parsear los distintos request recibidos mediante texto.
+/// Parser implementa el parseo de los request que se encuentran en un archivo
+/// dado.
 #[derive(Debug)]
 pub struct Parser {
     lector: io::BufReader<File>,
@@ -17,7 +18,7 @@ use std::{
 
 impl Parser {
     /// Devuelve una instancia de Parser.
-    /// Recibe el archivo del que debe leer los request y el logger donde debe notificar lo ejecutado.
+    /// Recibe la ruta del archivo a ser procesado.
     pub fn new(path: impl AsRef<std::path::Path>) -> Resultado<Parser> {
         let file = File::open(path)?;
         let parser = Parser {

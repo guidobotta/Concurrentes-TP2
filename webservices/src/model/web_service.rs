@@ -6,11 +6,14 @@ use common::mensaje::{Mensaje, CodigoMensaje};
 use common::dns::DNS;
 use rand::Rng;
 
+// TODO: Documentacion
 enum EstadoServicio {
     Ready,
     Commit,
     Abort
 }
+
+// TODO: Documentacion
 pub struct WebService {
     id: usize,
     protocolo: Protocolo,
@@ -18,6 +21,7 @@ pub struct WebService {
 }
 
 impl WebService {
+    // TODO: Documentacion
     pub fn new(id: usize) -> Self {
         WebService {
             log: HashMap::new(),
@@ -26,6 +30,7 @@ impl WebService {
         }
     }
 
+    // TODO: Documentacion
     pub fn run(&mut self) {
         loop {
             let mensaje = self.protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
@@ -39,6 +44,7 @@ impl WebService {
         }
     }
 
+    // TODO: Documentacion?? Es privada
     fn responder_prepare(&mut self, mensaje: Mensaje, monto: f64) {
         println!("[WEBSERVICE] Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
         let respuesta_ready = Mensaje::new(CodigoMensaje::READY, self.id, mensaje.id_op);
@@ -63,6 +69,7 @@ impl WebService {
         };
     }
     
+    // TODO: Documentacion?? Es privada
     fn responder_commit(&mut self, mensaje: Mensaje) {
         println!("[WEBSERVICE] Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
@@ -80,6 +87,7 @@ impl WebService {
         };
     }
     
+    // TODO: Documentacion?? Es privada
     fn responder_abort(&mut self, mensaje: Mensaje) {
         println!("[WEBSERVICE] Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
@@ -102,6 +110,7 @@ impl WebService {
         self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor);
     }
 
+    // TODO: Documentacion?? Es privada
     fn insertar_y_enviar(&mut self, estado: EstadoServicio, mensaje: Mensaje, id_emisor: usize) {
         self.log.insert(mensaje.id_op, estado);
         let direccion = DNS::direccion_alglobo(&id_emisor);
@@ -111,12 +120,14 @@ impl WebService {
         if enviado.is_err() { println!("[WEBSERVICE] Error: Fallo al enviar mensaje") }
     }
 
+    // TODO: Documentacion?? Es privada
     fn simular_trabajo(&self) {
         let mut rng = rand::thread_rng();
         let tiempo_trabajo = rng.gen_range(1000..3000); // TODO: env
         thread::sleep(Duration::from_millis(tiempo_trabajo));
     }
     
+    // TODO: Documentacion?? Es privada
     fn simular_resultado(&self) -> Result<(), ()> {
         let mut rng = rand::thread_rng();
         let ok = rng.gen::<f32>() >= 0.2; // TODO: env

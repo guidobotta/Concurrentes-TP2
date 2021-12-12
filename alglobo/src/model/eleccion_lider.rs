@@ -12,6 +12,9 @@ const TIMEOUT_LIDER: Duration = Duration::from_secs(6); // <- Si pasa este tiemp
 const TIMEOUT_MENSAJE: Duration = Duration::from_secs(10); // <- Tolerancia a recibir un mensaje
 const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); // <- Frecuencia de enviado del keep alive
 
+/// EleccionLider implementa la eleccion del lider y se encarga de mantener
+/// siempre un único lider activo a través del envío y recepción de mensajes
+/// con las distintas réplicas.
 pub struct EleccionLider {
     id: usize,
     protocolo: Protocolo,
@@ -22,6 +25,8 @@ pub struct EleccionLider {
 }
 
 impl EleccionLider {
+    /// Devuelve una instancia de EleccionLider.
+    /// Recibe el id asociado al nodo de alglobo.
     pub fn new(id: usize) -> EleccionLider {
         let protocolo = Protocolo::new(DNS::direccion_lider(&id)).unwrap();
 
@@ -41,6 +46,7 @@ impl EleccionLider {
         ret
     }
 
+    // TODO: Documentacion
     pub fn bloquear_si_no_soy_lider(&self) -> bool {
         self.id_lider
             .1
@@ -53,10 +59,12 @@ impl EleccionLider {
         true
     }
 
+    // TODO: Documentacion
     pub fn soy_lider(&self) -> bool {
         self.get_id_lider() == self.id
     }
 
+    // TODO: Documentacion
     pub fn get_id_lider(&self) -> usize {
         self.id_lider
             .1
@@ -67,10 +75,12 @@ impl EleccionLider {
             .unwrap()
     }
 
+    // TODO: Documentacion
     pub fn notificar_finalizacion(&mut self) {
         (0..TEAM_MEMBERS).for_each(|id| if id != self.id {self.enviar(CodigoLider::ELECCION, id).unwrap()});
     }
 
+    // TODO: Documentacion
     pub fn buscar_nuevo_lider(&mut self) {
         if *self.stop.0.lock().unwrap() {
             return;
@@ -101,6 +111,7 @@ impl EleccionLider {
         }
     }
 
+    // TODO: Documentacion
     pub fn finalizar(&mut self) {
         *self.stop.0.lock().unwrap() = true;
         self.notificar_finalizacion();
@@ -113,6 +124,7 @@ impl EleccionLider {
     //                                                                //
     ////////////////////////////////////////////////////////////////////
 
+    // TODO: Documentacion a todas las de abajo?? Son privadas
     fn enviar(&mut self, codigo: CodigoLider, id_destino: usize) -> Resultado<()>{
         let mensaje = MensajeLider::new(codigo, self.id);
         self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_destino))

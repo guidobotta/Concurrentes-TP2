@@ -1,6 +1,7 @@
 mod model;
 use model::web_service::WebService;
 
+// TODO: Documentacion?? Es privada
 fn run() {
     let id = match std::env::args()
         .nth(1)
@@ -18,6 +19,7 @@ fn run() {
     web_service.run();
 }
 
+// TODO: Documentacion?? Es privada
 fn main() {
     println!("WEBSERVICE");
     run()

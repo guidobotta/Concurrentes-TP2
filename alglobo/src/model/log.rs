@@ -9,6 +9,7 @@ use std::io::{prelude::*};
 
 use super::pago::Pago;
 
+// TODO: Documentacion
 #[derive(Clone, PartialEq)]
 pub enum EstadoTransaccion {
     Prepare,
@@ -16,6 +17,7 @@ pub enum EstadoTransaccion {
     Abort
 }
 
+// TODO: Documentacion
 #[derive(Clone)]
 pub struct Transaccion {
     pub id: usize,
@@ -26,10 +28,12 @@ pub struct Transaccion {
 }
 
 impl Transaccion {
+    // TODO: Documentacion
     pub fn new(id: usize, id_pago: usize, id_pago_prox: usize, estado: EstadoTransaccion) -> Self {
         Self { id, id_pago, id_pago_prox, estado, pago: None }
     }
 
+    // TODO: Documentacion
     pub fn default(id: usize) -> Self { 
         Self { 
             id, 
@@ -40,20 +44,24 @@ impl Transaccion {
         } 
     }
 
+    // TODO: Documentacion
     pub fn get_pago(&self) -> Option<Pago> {
         self.pago.as_ref().and_then(|p| Some(p.clone()))
     }
 
+    // TODO: Documentacion
     pub fn prepare(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Prepare;
         self
     }
 
+    // TODO: Documentacion
     pub fn commit(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Commit;
         self
     }
 
+    // TODO: Documentacion
     pub fn abort(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Abort;
         self

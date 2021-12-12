@@ -6,7 +6,7 @@ use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
 use std::sync::mpsc::channel;
 
-
+// TODO: Documentacion?? Es privada
 fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<()> {
     let parseador = Parser::new(path_pagos)?;
     let lider = EleccionLider::new(id);
@@ -31,6 +31,7 @@ fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<(
     Ok(())
 }
 
+// TODO: Documentacion?? Es privada
 fn main() {
     println!("NODO DE ALGLOBO");
     let path_pagos = match std::env::args().nth(1) {
