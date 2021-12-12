@@ -1,6 +1,9 @@
 use common::error::{ErrorApp, ErrorInterno, Resultado};
 
-// TODO: Documentacion
+/// Comando enumera los posibles comandos.
+/// # Variantes
+/// REINTENTAR: simboliza un intento y contiene el id del pago correspondiente
+/// FINALIZAR: simboliza la finalización de la ejecución de la aplicación
 #[derive(Clone, PartialEq, Debug)]
 pub enum Comando {
     REINTENTAR { id: usize },
@@ -8,7 +11,8 @@ pub enum Comando {
 }
 
 impl Comando {
-    // TODO: Documentacion
+    /// Recibe una cadena y devuelve la cadena decodificada.
+    /// Devuelve error si la cadena no corresponde a ninguna de las variantes.
     pub fn decodificar(mensaje_codificado: &String) -> Resultado<Comando> {
         let parseado = mensaje_codificado.split(' ').collect::<Vec<&str>>();
         match parseado[0] {

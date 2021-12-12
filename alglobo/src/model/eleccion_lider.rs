@@ -1,6 +1,5 @@
 use common::error::Resultado;
-use common::mensaje_lider::{CodigoLider, MensajeLider};
-use common::protocolo::Protocolo;
+use common::protocolo_lider::{ProtocoloLider, CodigoLider, MensajeLider};
 use std::fmt::Result;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
@@ -17,7 +16,7 @@ const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); // <- Frecuencia
 /// con las distintas réplicas.
 pub struct EleccionLider {
     id: usize,
-    protocolo: Protocolo,
+    protocolo: ProtocoloLider,
     id_lider: Arc<(Mutex<Option<usize>>, Condvar)>,
     obtuve_ok: Arc<(Mutex<bool>, Condvar)>,
     stop: Arc<(Mutex<bool>, Condvar)>,
@@ -28,7 +27,7 @@ impl EleccionLider {
     /// Devuelve una instancia de EleccionLider.
     /// Recibe el id asociado al nodo de alglobo.
     pub fn new(id: usize) -> EleccionLider {
-        let protocolo = Protocolo::new(DNS::direccion_lider(&id)).unwrap();
+        let protocolo = ProtocoloLider::new(DNS::direccion_lider(&id)).unwrap();
 
         let mut ret = EleccionLider {
             id,
@@ -127,7 +126,7 @@ impl EleccionLider {
     // TODO: Documentacion a todas las de abajo?? Son privadas
     fn enviar(&mut self, codigo: CodigoLider, id_destino: usize) -> Resultado<()>{
         let mensaje = MensajeLider::new(codigo, self.id);
-        self.protocolo.enviar_lider(&mensaje, DNS::direccion_lider(&id_destino))
+        self.protocolo.enviar(&mensaje, DNS::direccion_lider(&id_destino))
     }
 
     fn enviar_eleccion(&mut self) {
@@ -147,7 +146,7 @@ impl EleccionLider {
         let mut threads = Vec::new();
         while !*self.stop.0.lock().unwrap() {
             // TODO: revisar el timeout
-            if let Ok(mensaje) = self.protocolo.recibir_lider(Some(TIMEOUT_MENSAJE)) {
+            if let Ok(mensaje) = self.protocolo.recibir(Some(TIMEOUT_MENSAJE)) {
                 let id_emisor = mensaje.id_emisor;                
                 match mensaje.codigo {
                     CodigoLider::OK => self.recibir_ok(),
@@ -209,7 +208,7 @@ impl EleccionLider {
     fn clone(&self) -> EleccionLider {
         EleccionLider {
             id: self.id,
-            protocolo: self.protocolo.clone(),
+            protocolo: self.protocolo.clone().unwrap(),
             id_lider: self.id_lider.clone(),
             obtuve_ok: self.obtuve_ok.clone(),
             stop: self.stop.clone(),

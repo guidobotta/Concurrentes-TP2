@@ -1,3 +1,5 @@
+/// DNS implementa la traduccion de direcciones segun el id y el tipo de
+/// proceso.
 pub struct DNS {}
 
 impl DNS {

@@ -19,7 +19,9 @@ fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<(
         entrada = entrada.replace("\n", "");
 
         if let Ok(comando) = Comando::decodificar(&entrada) {
-            enviador.send(comando.clone()).unwrap(); //TODO
+            if let Err(e) = enviador.send(comando.clone()){
+                println!("{}", e);
+            }
             if let Comando::FINALIZAR = comando { break; }
         } else {
             println!("[Aplicacion]: Comando no interpretado")

@@ -1,5 +1,4 @@
 pub mod error;
-pub mod protocolo;
-pub mod mensaje;
+pub mod protocolo_transaccion;
+pub mod protocolo_lider;
 pub mod dns;
-pub mod mensaje_lider;

@@ -29,8 +29,10 @@ impl ParserFallidos {
         })
     }
 
-    // TODO: Documentacion
-    pub fn parsear_fallido(&mut self, id: usize) -> Resultado<Option<Pago>> {
+    /// Parsea un pago correspondiente al id pasado por parámetro.
+    /// Devuelve el pago parseado si lo encuentra o None si llega al final
+    /// del archivo.
+    pub fn parsear(&mut self, id: usize) -> Resultado<Option<Pago>> {
         self.archivo.seek(io::SeekFrom::Start(0))?;
         let lector = io::BufReader::new(&self.archivo);
         let mut pago = None;
@@ -63,9 +65,9 @@ impl ParserFallidos {
         Ok(pago)
     }
 
-    // TODO: Documentacion
+    // Escribe un pago fallido en el archivo de fallidos.
     pub fn escribir_fallido(&mut self, pago: Pago) {
-        self.archivo.seek(io::SeekFrom::End(0));
+        let _ = self.archivo.seek(io::SeekFrom::End(0));
         let salida = self.formatear_pago(pago);
 
         match writeln!(self.archivo, "{}", salida) {

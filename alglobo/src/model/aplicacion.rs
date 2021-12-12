@@ -14,7 +14,11 @@ pub struct Aplicacion {
     handle: JoinHandle<()>
 }
 
-// TODO: Documentacion
+/// EstadoApp representa el estado de la aplicación.
+/// # Variantes
+/// FinEntrada: simboliza TODO: COMPLETAR
+/// CambioLider: simboliza TODO: COMPLETAR
+/// Finalizar: simboliza TODO: COMPLETAR
 pub enum EstadoApp {
     FinEntrada,
     CambioLider,
@@ -22,7 +26,7 @@ pub enum EstadoApp {
 }
 
 impl Aplicacion {
-    // TODO: Documentacion
+    /// Devuelve una instancia de Aplicacion.
     pub fn new(
         id: usize, 
         lider: EleccionLider, 
@@ -76,9 +80,9 @@ impl Aplicacion {
         receptor: &mut Receiver<Comando>, 
         id: usize) -> Resultado<EstadoApp> {
 
-        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string()).unwrap()));
-        let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
-        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
+        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string())?));
+        let mut coordinador = CoordinadorTransaccion::new(id, log.clone())?;
+        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string())?;
         let mut inicio_lider = true;
         let mut transaccion;
         let mut prox_pago = 1;
@@ -88,12 +92,17 @@ impl Aplicacion {
             //Este if inicio_lider se puede sacar fuera del while, porque ya sabemos que es lider
             if inicio_lider {
                 inicio_lider = false;
-                transaccion = match log.read().unwrap().ultima_transaccion() {
+                transaccion = match log.read()
+                                    .expect("Error al tomar lock del log en Aplicacion")
+                                    .ultima_transaccion() {
                     Some(t) => t,
-                    None => continue
+                    None => {
+                        println!("No se encontro nada");
+                        continue
+                    }
                 };
                 prox_pago = transaccion.id_pago_prox;
-                transaccion.pago = match parseador.parsear_nuevo(Some(transaccion.id_pago)).ok() {
+                transaccion.pago = match parseador.parsear(Some(transaccion.id_pago)).ok() {
                     Some(Some(p)) => Some(p),
                     _ => { panic!("ERROR: El log de transacciones no matchea con el archivo de entrada") }
                 };
@@ -107,8 +116,10 @@ impl Aplicacion {
                     _ => continue 
                 };
             } else {
-                transaccion = log.read().unwrap().nueva_transaccion(prox_pago);
-                transaccion.pago = match parseador.parsear_nuevo(Some(prox_pago)).ok() {
+                transaccion = log.read()
+                                .expect("Error al tomar lock del log en Aplicacion")
+                                .nueva_transaccion(prox_pago, prox_pago + 1);
+                transaccion.pago = match parseador.parsear(Some(prox_pago)).ok() {
                     Some(None) => return Ok(EstadoApp::FinEntrada),
                     Some(p) => p,
                     _ => {panic!("Algo malo paso")}
@@ -133,14 +144,14 @@ impl Aplicacion {
         receptor: &mut Receiver<Comando>, 
         id: usize) -> Resultado<EstadoApp> {
 
-        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string()).unwrap()));
-        let mut coordinador = CoordinadorTransaccion::new(id, log.clone());
-        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string()).unwrap();
+        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string())?));
+        let mut coordinador = CoordinadorTransaccion::new(id, log.clone())?;
+        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string())?;
         let mut transaccion;
-        let prox_pago = log.read().unwrap()
-                                            .ultima_transaccion()
-                                            .and_then(|t| Some(t.id_pago_prox))
-                                            .unwrap_or(1);
+        let prox_pago = log.read().expect("Error al tomar lock del log en Aplicacion")
+                                        .ultima_transaccion()
+                                        .and_then(|t| Some(t.id_pago_prox))
+                                        .unwrap_or(1);
         
         while lider.soy_lider() {
             if let Ok(comando) = receptor.recv() {
@@ -170,11 +181,9 @@ impl Aplicacion {
                         log: &Arc<RwLock<Log>>,
                         prox_pago: usize) -> Resultado<Option<Transaccion>>{
                             
-        let mut transaccion = log.read().unwrap().nueva_transaccion(prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
-        transaccion.id_pago = id_reintento;
-        transaccion.id_pago_prox = prox_pago;
+        let mut transaccion = log.read()?.nueva_transaccion(id_reintento, prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
 
-        match parser.parsear_fallido(id_reintento) {
+        match parser.parsear(id_reintento) {
             Ok(Some(pago)) => {
                 println!("[Aplicacion]: Se reintenta el pago de id {}", id_reintento);
                 transaccion.pago = Some(pago)

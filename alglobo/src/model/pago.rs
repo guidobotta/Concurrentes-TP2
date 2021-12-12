@@ -1,4 +1,5 @@
-// TODO: Documentacion
+/// Pago representa un pago a realizar. Contiene el monto a pagar de la
+/// aerolínea y del hotel.
 #[derive(Clone)]
 pub struct Pago {
     id: usize,
@@ -6,8 +7,9 @@ pub struct Pago {
     monto_hotel: f64,
 }
 
-// TODO: Documentacion
 impl Pago {
+    /// Devuelve una instancia de Pago.
+    /// Recibe el id del pago, el monto de la aerolinea y el monto del hotel.
     pub fn new(id: usize, monto_aerolinea: f64, monto_hotel: f64) -> Pago {
         let pago = Pago {
             id,
@@ -17,17 +19,17 @@ impl Pago {
         pago
     }
 
-    // TODO: Documentacion
+    // Devuelve el id del pago.
     pub fn get_id(&self) -> usize {
         self.id
     }
 
-    // TODO: Documentacion
+    // Devuelve el monto de la aerolínea.
     pub fn get_monto_aerolinea(&self) -> f64 {
         self.monto_aerolinea
     }
 
-    // TODO: Documentacion
+    // Devuelve el monto del hotel.
     pub fn get_monto_hotel(&self) -> f64 {
         self.monto_hotel
     }

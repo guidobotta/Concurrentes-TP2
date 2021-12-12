@@ -1,36 +1,46 @@
 use std::time::Duration;
 use std::collections::HashMap;
 use std::thread;
-use common::protocolo::Protocolo;
-use common::mensaje::{Mensaje, CodigoMensaje};
+use common::protocolo_transaccion::{ProtocoloTransaccion, CodigoMensaje, MensajeTransaccion};
 use common::dns::DNS;
 use rand::Rng;
 
-// TODO: Documentacion
+/// EstadoServicio representa el estado de la transacción de cierto id.
+/// # Variantes
+/// Ready: simboliza el estado ready luego de obtener los recursos exitosamente.
+/// Commit: simboliza el estado commit luego de recibir un mensaje de commit.
+/// Abort: simboliza el estado abort luego de recibir un mensaje de abort o de
+/// haber fallado al obtener los recursos.
 enum EstadoServicio {
     Ready,
     Commit,
     Abort
 }
 
-// TODO: Documentacion
+/// WebService implementa el flujo principal del WebService. Realiza la
+/// comunicación con el nodo lider de alglobo y simula trabajo y el éxito o
+/// fracaso al intentar obtener los recursos en un prepare.
 pub struct WebService {
     id: usize,
-    protocolo: Protocolo,
+    protocolo: ProtocoloTransaccion,
     log: HashMap<usize, EstadoServicio>
 }
 
 impl WebService {
-    // TODO: Documentacion
+    /// Devuelve una instancia de WebService.
+    /// Recibe un id. Cada id representa un servicio:
+    /// - 0 para la aerolinea
+    /// - 1 para el hotel
+    /// - 2 para el banco
     pub fn new(id: usize) -> Self {
         WebService {
             log: HashMap::new(),
-            protocolo: Protocolo::new(DNS::direccion_webservice(&id)).unwrap(),
+            protocolo: ProtocoloTransaccion::new(DNS::direccion_webservice(&id)).unwrap(),
             id
         }
     }
 
-    // TODO: Documentacion
+    /// Corre el flujo principal del programa cíclicamente.
     pub fn run(&mut self) {
         loop {
             let mensaje = self.protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
@@ -45,11 +55,11 @@ impl WebService {
     }
 
     // TODO: Documentacion?? Es privada
-    fn responder_prepare(&mut self, mensaje: Mensaje, monto: f64) {
+    fn responder_prepare(&mut self, mensaje: MensajeTransaccion, monto: f64) {
         println!("[WEBSERVICE] Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
-        let respuesta_ready = Mensaje::new(CodigoMensaje::READY, self.id, mensaje.id_op);
-        let respuesta_commit = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
-        let respuesta_abort = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
+        let respuesta_ready = MensajeTransaccion::new(CodigoMensaje::READY, self.id, mensaje.id_op);
+        let respuesta_commit = MensajeTransaccion::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
+        let respuesta_abort = MensajeTransaccion::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
@@ -70,10 +80,10 @@ impl WebService {
     }
     
     // TODO: Documentacion?? Es privada
-    fn responder_commit(&mut self, mensaje: Mensaje) {
+    fn responder_commit(&mut self, mensaje: MensajeTransaccion) {
         println!("[WEBSERVICE] Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
-        let respuesta = Mensaje::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
+        let respuesta = MensajeTransaccion::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
@@ -88,10 +98,10 @@ impl WebService {
     }
     
     // TODO: Documentacion?? Es privada
-    fn responder_abort(&mut self, mensaje: Mensaje) {
+    fn responder_abort(&mut self, mensaje: MensajeTransaccion) {
         println!("[WEBSERVICE] Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
-        let respuesta = Mensaje::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
+        let respuesta = MensajeTransaccion::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
@@ -111,7 +121,7 @@ impl WebService {
     }
 
     // TODO: Documentacion?? Es privada
-    fn insertar_y_enviar(&mut self, estado: EstadoServicio, mensaje: Mensaje, id_emisor: usize) {
+    fn insertar_y_enviar(&mut self, estado: EstadoServicio, mensaje: MensajeTransaccion, id_emisor: usize) {
         self.log.insert(mensaje.id_op, estado);
         let direccion = DNS::direccion_alglobo(&id_emisor);
 
