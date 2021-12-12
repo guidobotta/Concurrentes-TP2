@@ -31,26 +31,34 @@ impl ParserFallidos {
     pub fn parsear_fallido(&mut self, id: usize) -> Resultado<Option<Pago>> {
         self.archivo.seek(io::SeekFrom::Start(0))?;
         let lector = io::BufReader::new(&self.archivo);
+        let mut pago = None;
 
-        for line in lector.lines() {
-            let linea = line?;
-            let cap = match self.matcher.captures(&linea) {
-                None => continue,
-                Some(value) => value,
-            };
+        let lines = lector.lines().map(|line| {
+            let linea = line.unwrap();
 
-            if cap[1].parse::<usize>()? == id {
-                println!("[Parser Fallidos] Reintento de pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
-                    &cap[1], &cap[2], &cap[3]);
-                return Ok(Some(Pago::new(
-                    cap[1].parse::<usize>().unwrap(),
-                    cap[2].parse::<f64>().unwrap(),
-                    cap[3].parse::<f64>().unwrap(),
-                )));
+            if let Some(cap) = self.matcher.captures(&linea) {
+                if cap[1].parse::<usize>().unwrap() == id {
+                    println!("[Parser Fallidos] Reintento de pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
+                        &cap[1], &cap[2], &cap[3]);
+                    pago = Some(Pago::new(
+                        cap[1].parse::<usize>().unwrap(),
+                        cap[2].parse::<f64>().unwrap(),
+                        cap[3].parse::<f64>().unwrap(),
+                    ));
+
+                    "".to_string()
+                } else {
+                    linea + "\n"
+                }
+            } else {
+                "".to_string()
             }
-        }
+        }).collect::<Vec<String>>().join("");
 
-        Ok(None)
+        if pago.is_some() { 
+            fs::write("./files/fallidos.csv", lines).expect("Can't write"); // TODO: ver esto, cambiar el path o si se puede hacer distinto
+        }
+        Ok(pago)
     }
 
     pub fn escribir_fallido(&mut self, pago: Pago) {
