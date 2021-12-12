@@ -16,9 +16,9 @@ pub struct Aplicacion {
 
 /// EstadoApp representa el estado de la aplicación.
 /// # Variantes
-/// FinEntrada: simboliza TODO: COMPLETAR
-/// CambioLider: simboliza TODO: COMPLETAR
-/// Finalizar: simboliza TODO: COMPLETAR
+/// FinEntrada: simboliza TODO: COMPLETAR DOCUMENTACION
+/// CambioLider: simboliza TODO: COMPLETAR DOCUMENTACION
+/// Finalizar: simboliza TODO: COMPLETAR DOCUMENTACION
 pub enum EstadoApp {
     FinEntrada,
     CambioLider,

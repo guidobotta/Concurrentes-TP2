@@ -2,14 +2,20 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Write, BufReader};
-use std::sync::Arc;
 use common::error::Resultado;
 use regex::Regex;
 use std::io::{prelude::*};
 
 use super::pago::Pago;
 
-// TODO: Documentacion
+/// EstadoTransaccion representa el estado de la transaccion.
+/// # Variantes
+/// Prepare: simboliza el estado de prepare completo. En este estado se puede
+/// realizar commit.
+/// Commit: simboliza el estado commit completo. Es decir, la transacción fue
+/// correctamente completada.
+/// Abort: simboliza el estado abort completo. Es decir, la transacción fue
+/// correctamente abortada.
 #[derive(Clone, PartialEq)]
 pub enum EstadoTransaccion {
     Prepare,
@@ -17,7 +23,8 @@ pub enum EstadoTransaccion {
     Abort
 }
 
-// TODO: Documentacion
+/// Representa una transaccion. Contiene información sobre el pago actual y
+/// sobre el pago siguiente.
 #[derive(Clone)]
 pub struct Transaccion {
     pub id: usize,
@@ -28,7 +35,9 @@ pub struct Transaccion {
 }
 
 impl Transaccion {
-    // TODO: Documentacion
+    /// Devuelve una instancia de Transaccion.
+    /// Recibe el id de la transaccion, el id del pago actual, el id del pago
+    /// proximo y el estado de la transaccion.
     pub fn new(id: usize, id_pago: usize, id_pago_prox: usize, estado: EstadoTransaccion) -> Self {
         Self { id, id_pago, id_pago_prox, estado, pago: None }
     }
@@ -38,19 +47,19 @@ impl Transaccion {
         self.pago.as_ref().and_then(|p| Some(p.clone()))
     }
 
-    // TODO: Documentacion
+    /// Cambiar el estado de la transacción a Prepare.
     pub fn prepare(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Prepare;
         self
     }
 
-    // TODO: Documentacion
+    /// Cambiar el estado de la transacción a Commit.
     pub fn commit(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Commit;
         self
     }
 
-    // TODO: Documentacion
+    /// Cambiar el estado de la transacción a Abort.
     pub fn abort(&mut self) -> &Self { 
         self.estado = EstadoTransaccion::Abort;
         self
@@ -97,12 +106,12 @@ impl Log {
         Transaccion::new(id + 1, id_pago, id_prox_pago, EstadoTransaccion::Prepare)
     }
 
-    // TODO: Documentacion
+    /// Recibe un id y devuelve una transacción si lo contiene o None si no.
     pub fn obtener(&self, id: &usize) -> Option<Transaccion> {
         self.log.get(id).and_then(|t| Some(t.clone()))
     }
 
-    // TODO: Documentacion
+    /// Inserta una transacción en el log de transacciones.
     pub fn insertar(&mut self, transaccion: &Transaccion) {        
         if let Some(t) = self.obtener(&transaccion.id) {
             if t.estado == transaccion.estado { return; }
@@ -163,7 +172,7 @@ impl Log {
          Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado))
     }
 
-    // TODO: Documentacion
+    /// Devuelve la última transacción.
     pub fn ultima_transaccion(&self) -> Option<Transaccion> {
         self.ultima_trans.clone()
     }
