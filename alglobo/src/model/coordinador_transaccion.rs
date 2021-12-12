@@ -90,12 +90,12 @@ impl CoordinadorTransaccion {
         let pago = transaccion.get_pago().expect("Intento de ejecutar transaccion sin pago");
         //TODO: Hay que cambiar en el Mensaje el id_op por id_transaccion, sino no vamos a poder reintentar.
         // Preparo los mensajes a enviar
-        let m_hotel = MensajeTransaccion::new(MensajeTransaccion::PREPARE { monto: pago.get_monto_hotel()}, self.id, id_op);
-        let m_aerolinea = MensajeTransaccion::new(MensajeTransaccion::PREPARE { monto: pago.get_monto_aerolinea()}, self.id, id_op);
-        let m_banco = MensajeTransaccion::new(MensajeTransaccion::PREPARE { monto: pago.get_monto_hotel() + pago.get_monto_aerolinea()}, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
+        let m_hotel = MensajeTransaccion::new(CodigoTransaccion::PREPARE { monto: pago.get_monto_hotel()}, self.id, id_op);
+        let m_aerolinea = MensajeTransaccion::new(CodigoTransaccion::PREPARE { monto: pago.get_monto_aerolinea()}, self.id, id_op);
+        let m_banco = MensajeTransaccion::new(CodigoTransaccion::PREPARE { monto: pago.get_monto_hotel() + pago.get_monto_aerolinea()}, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
 
         // Mensaje esperado
-        let esperado = MensajeTransaccion::new(MensajeTransaccion::READY, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
+        let esperado = MensajeTransaccion::new(CodigoTransaccion::READY, self.id, id_op); // TODO: PASAR ESTO AL PARSER 
         
         self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
     }
@@ -109,7 +109,7 @@ impl CoordinadorTransaccion {
         let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
-        let mensaje = MensajeTransaccion::new(MensajeTransaccion::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
+        let mensaje = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
 
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
@@ -124,7 +124,7 @@ impl CoordinadorTransaccion {
         let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
-        let mensaje = MensajeTransaccion::new(MensajeTransaccion::ABORT, self.id, id_op);
+        let mensaje = MensajeTransaccion::new(CodigoTransaccion::ABORT, self.id, id_op);
 
         self.send_and_wait(vec![mensaje.clone(), mensaje.clone(), mensaje.clone()], mensaje)
     }
@@ -180,7 +180,7 @@ impl CoordinadorTransaccion {
             }; // TODO: Revisar si hacer esto es correcto
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {
-                MensajeTransaccion::READY | MensajeTransaccion::COMMIT | MensajeTransaccion::ABORT => {
+                CodigoTransaccion::READY | CodigoTransaccion::COMMIT | CodigoTransaccion::ABORT => {
                     //println!("[COORDINATOR] recibí READY de {}", id_emisor);
                     responses.0.
                         lock()

@@ -208,7 +208,7 @@ impl EleccionLider {
     fn clone(&self) -> EleccionLider {
         EleccionLider {
             id: self.id,
-            protocolo: self.protocolo.clone().unwrap(),
+            protocolo: self.protocolo.clone(), // TODO: ACA LE SAQUE EL UNWRAP
             id_lider: self.id_lider.clone(),
             obtuve_ok: self.obtuve_ok.clone(),
             stop: self.stop.clone(),

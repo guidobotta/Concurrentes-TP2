@@ -180,8 +180,9 @@ impl Aplicacion {
                         parser: &mut ParserFallidos,
                         log: &Arc<RwLock<Log>>,
                         prox_pago: usize) -> Resultado<Option<Transaccion>>{
-                            
-        let mut transaccion = log.read()?.nueva_transaccion(id_reintento, prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
+                       
+                            // TODO: LE CAMBIE EL = POR UNWRAP()
+        let mut transaccion = log.read().unwrap().nueva_transaccion(id_reintento, prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
 
         match parser.parsear(id_reintento) {
             Ok(Some(pago)) => {

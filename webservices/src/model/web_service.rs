@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::collections::HashMap;
 use std::thread;
-use common::protocolo_transaccion::{ProtocoloTransaccion, CodigoMensaje, MensajeTransaccion};
+use common::protocolo_transaccion::{ProtocoloTransaccion, CodigoTransaccion, MensajeTransaccion};
 use common::dns::DNS;
 use rand::Rng;
 
@@ -46,9 +46,9 @@ impl WebService {
             let mensaje = self.protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
 
             match mensaje.codigo {
-                CodigoMensaje::PREPARE {monto} => self.responder_prepare(mensaje, monto),
-                CodigoMensaje::COMMIT => self.responder_commit(mensaje),
-                CodigoMensaje::ABORT => self.responder_abort(mensaje),
+                CodigoTransaccion::PREPARE {monto} => self.responder_prepare(mensaje, monto),
+                CodigoTransaccion::COMMIT => self.responder_commit(mensaje),
+                CodigoTransaccion::ABORT => self.responder_abort(mensaje),
                 _ => println!("[WEBSERVICE] Recibí algo que no puedo interpretar de {}", mensaje.id_emisor)
             }
         }
@@ -57,9 +57,9 @@ impl WebService {
     // TODO: Documentacion?? Es privada
     fn responder_prepare(&mut self, mensaje: MensajeTransaccion, monto: f64) {
         println!("[WEBSERVICE] Recibí PREPARE de {} para el pago {} con monto {}", mensaje.id_emisor, mensaje.id_op, monto);
-        let respuesta_ready = MensajeTransaccion::new(CodigoMensaje::READY, self.id, mensaje.id_op);
-        let respuesta_commit = MensajeTransaccion::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
-        let respuesta_abort = MensajeTransaccion::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
+        let respuesta_ready = MensajeTransaccion::new(CodigoTransaccion::READY, self.id, mensaje.id_op);
+        let respuesta_commit = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, mensaje.id_op);
+        let respuesta_abort = MensajeTransaccion::new(CodigoTransaccion::ABORT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
@@ -83,7 +83,7 @@ impl WebService {
     fn responder_commit(&mut self, mensaje: MensajeTransaccion) {
         println!("[WEBSERVICE] Recibí COMMIT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
-        let respuesta = MensajeTransaccion::new(CodigoMensaje::COMMIT, self.id, mensaje.id_op);
+        let respuesta = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
@@ -101,7 +101,7 @@ impl WebService {
     fn responder_abort(&mut self, mensaje: MensajeTransaccion) {
         println!("[WEBSERVICE] Recibí ABORT de {} para el pago {}", mensaje.id_emisor, mensaje.id_op);
 
-        let respuesta = MensajeTransaccion::new(CodigoMensaje::ABORT, self.id, mensaje.id_op);
+        let respuesta = MensajeTransaccion::new(CodigoTransaccion::ABORT, self.id, mensaje.id_op);
 
         if let Some(estado) = self.log.get(&mensaje.id_op) {
             match estado {
