@@ -1,6 +1,6 @@
 mod model;
-use model::aplicacion::Aplicacion;
 use common::error::Resultado;
+use model::aplicacion::Aplicacion;
 use model::comando::Comando;
 use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
@@ -19,10 +19,12 @@ fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<(
         entrada = entrada.replace("\n", "");
 
         if let Ok(comando) = Comando::decodificar(&entrada) {
-            if let Err(e) = enviador.send(comando.clone()){
+            if let Err(e) = enviador.send(comando.clone()) {
                 println!("{}", e);
             }
-            if let Comando::FINALIZAR = comando { break; }
+            if let Comando::FINALIZAR = comando {
+                break;
+            }
         } else {
             println!("[Aplicacion]: Comando no interpretado")
         }

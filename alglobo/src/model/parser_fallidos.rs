@@ -1,11 +1,9 @@
-use std::fs;
-use std::fs::File;
+use super::pago::Pago;
 use common::error::Resultado;
 use regex::Regex;
-use std::{
-    io::{self, prelude::*},
-};
-use super::pago::Pago;
+use std::fs;
+use std::fs::File;
+use std::io::{self, prelude::*};
 
 /// ParserFallidos implementa el parseo de los request fallidos que se
 /// encuentran en un archivo dado.
@@ -20,11 +18,11 @@ impl ParserFallidos {
     pub fn new(path: String) -> Resultado<Self> {
         Ok(ParserFallidos {
             archivo: fs::OpenOptions::new()
-                    .write(true)
-                    .read(true)
-                    .append(true)
-                    .create(true)
-                    .open(path)?,
+                .write(true)
+                .read(true)
+                .append(true)
+                .create(true)
+                .open(path)?,
             matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$")?,
         })
     }
@@ -59,7 +57,7 @@ impl ParserFallidos {
             }
         }).collect::<Vec<String>>().join("");
 
-        if pago.is_some() { 
+        if pago.is_some() {
             fs::write("./files/fallidos.csv", lines).expect("Can't write"); // TODO: ver esto, cambiar el path o si se puede hacer distinto
         }
         Ok(pago)
@@ -72,15 +70,17 @@ impl ParserFallidos {
 
         match writeln!(self.archivo, "{}", salida) {
             Ok(v) => v,
-            Err(e) => println!(
-                "[ParserFallidos] No se pudo escribir en el archivo : {}",
-                e
-            ),
+            Err(e) => println!("[ParserFallidos] No se pudo escribir en el archivo : {}", e),
         }
     }
-    
+
     // TODO: Documentacion?? Es privada
     fn formatear_pago(&self, pago: Pago) -> String {
-        format!("{},{:.2},{:.2}", pago.get_id(), pago.get_monto_aerolinea(), pago.get_monto_hotel())
+        format!(
+            "{},{:.2},{:.2}",
+            pago.get_id(),
+            pago.get_monto_aerolinea(),
+            pago.get_monto_hotel()
+        )
     }
 }

@@ -1,10 +1,10 @@
+use common::error::Resultado;
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
-use std::io::{Write, BufReader};
-use common::error::Resultado;
-use regex::Regex;
-use std::io::{prelude::*};
+use std::io::prelude::*;
+use std::io::{BufReader, Write};
 
 use super::pago::Pago;
 
@@ -20,7 +20,7 @@ use super::pago::Pago;
 pub enum EstadoTransaccion {
     Prepare,
     Commit,
-    Abort
+    Abort,
 }
 
 /// Representa una transaccion. Contiene información sobre el pago actual y
@@ -31,7 +31,7 @@ pub struct Transaccion {
     pub id_pago: usize,
     pub id_pago_prox: usize,
     pub estado: EstadoTransaccion,
-    pub pago: Option<Pago>
+    pub pago: Option<Pago>,
 }
 
 impl Transaccion {
@@ -39,7 +39,13 @@ impl Transaccion {
     /// Recibe el id de la transaccion, el id del pago actual, el id del pago
     /// proximo y el estado de la transaccion.
     pub fn new(id: usize, id_pago: usize, id_pago_prox: usize, estado: EstadoTransaccion) -> Self {
-        Self { id, id_pago, id_pago_prox, estado, pago: None }
+        Self {
+            id,
+            id_pago,
+            id_pago_prox,
+            estado,
+            pago: None,
+        }
     }
 
     // TODO: Documentacion
@@ -48,19 +54,19 @@ impl Transaccion {
     }
 
     /// Cambiar el estado de la transacción a Prepare.
-    pub fn prepare(&mut self) -> &Self { 
+    pub fn prepare(&mut self) -> &Self {
         self.estado = EstadoTransaccion::Prepare;
         self
     }
 
     /// Cambiar el estado de la transacción a Commit.
-    pub fn commit(&mut self) -> &Self { 
+    pub fn commit(&mut self) -> &Self {
         self.estado = EstadoTransaccion::Commit;
         self
     }
 
     /// Cambiar el estado de la transacción a Abort.
-    pub fn abort(&mut self) -> &Self { 
+    pub fn abort(&mut self) -> &Self {
         self.estado = EstadoTransaccion::Abort;
         self
     }
@@ -71,38 +77,41 @@ pub struct Log {
     archivo: File,
     log: HashMap<usize, Transaccion>,
     siguiente_id: usize,
-    ultima_trans: Option<Transaccion>
+    ultima_trans: Option<Transaccion>,
 }
 
 impl Log {
     /// Genera una instancia de la clase.
     /// Recibe un path donde dicho archivo debe ser construido.
     pub fn new(path: String) -> Resultado<Self> {
-        
         let archivo = fs::OpenOptions::new()
-                         .read(true)                 
-                         .write(true)
-                         .append(true)
-                         .create(true)
-                         .open(path)?;
-        
+            .read(true)
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(path)?;
+
         let mut log = Log {
             archivo,
             siguiente_id: 1,
             log: HashMap::new(),
-            ultima_trans: None
+            ultima_trans: None,
         };
 
         log.leer_archivo();
-        
+
         Ok(log)
-    }    
+    }
 
     // TODO: Documentacion
     pub fn nueva_transaccion(&self, id_pago: usize, id_prox_pago: usize) -> Transaccion {
         //La idea es que devuelva una transaccion semi inicializada, con el id seteado.
         //Luego habra que cargarle los demas campos
-        let id = self.ultima_trans.as_ref().and_then(|t| Some(t.id)).unwrap_or(0);
+        let id = self
+            .ultima_trans
+            .as_ref()
+            .and_then(|t| Some(t.id))
+            .unwrap_or(0);
         Transaccion::new(id + 1, id_pago, id_prox_pago, EstadoTransaccion::Prepare)
     }
 
@@ -112,9 +121,11 @@ impl Log {
     }
 
     /// Inserta una transacción en el log de transacciones.
-    pub fn insertar(&mut self, transaccion: &Transaccion) {        
+    pub fn insertar(&mut self, transaccion: &Transaccion) {
         if let Some(t) = self.obtener(&transaccion.id) {
-            if t.estado == transaccion.estado { return; }
+            if t.estado == transaccion.estado {
+                return;
+            }
         }
         let salida = self.formatear_transaccion(transaccion);
         self.log.insert(transaccion.id, transaccion.clone());
@@ -127,7 +138,7 @@ impl Log {
         let estado = match &t.estado {
             EstadoTransaccion::Commit => "COMMIT",
             EstadoTransaccion::Abort => "ABORT",
-            EstadoTransaccion::Prepare => "PREPARE"
+            EstadoTransaccion::Prepare => "PREPARE",
         };
 
         format!("{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado)
@@ -161,15 +172,15 @@ impl Log {
         let pago_id = argumentos[2].parse::<usize>()?;
         let prox_pago_id = argumentos[3].parse::<usize>()?;
         let operacion = &argumentos[4];
-        
+
         let estado = match operacion {
-             "COMMIT" => EstadoTransaccion::Commit,
-             "ABORT" => EstadoTransaccion::Abort,
-             "PREPARE" => EstadoTransaccion::Prepare,
-             _ => panic!("Estado erroneo")
+            "COMMIT" => EstadoTransaccion::Commit,
+            "ABORT" => EstadoTransaccion::Abort,
+            "PREPARE" => EstadoTransaccion::Prepare,
+            _ => panic!("Estado erroneo"),
         };
 
-         Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado))
+        Ok(Transaccion::new(trans_id, pago_id, prox_pago_id, estado))
     }
 
     /// Devuelve la última transacción.

@@ -1,5 +1,5 @@
-use common::error::Resultado;
 use super::pago::Pago;
+use common::error::Resultado;
 use regex::Regex;
 
 /// Parser implementa el parseo de los request que se encuentran en un archivo
@@ -34,12 +34,11 @@ impl Parser {
     /// Devuelve el pago parseado si lo encuentra o None si llega al final
     /// del archivo.
     pub fn parsear(&mut self, id: Option<usize>) -> Resultado<Option<Pago>> {
-        
         loop {
             let mut buffer = String::new();
             let bytes = self.lector.read_line(&mut buffer)?;
 
-            if bytes == 0 { 
+            if bytes == 0 {
                 // Llegue al final del archivo
                 return Ok(None);
             }
@@ -53,9 +52,11 @@ impl Parser {
 
             self.posicion = cap[1].parse::<usize>().unwrap();
             if let Some(id_buscado) = id {
-                if id_buscado > self.posicion {continue}
+                if id_buscado > self.posicion {
+                    continue;
+                }
             }
-            
+
             println!("[Parser] Nuevo pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
                     &cap[1], &cap[2], &cap[3]);
 
