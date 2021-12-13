@@ -71,7 +71,8 @@ impl CoordinadorTransaccion {
                 EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
                     Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")))
-                }
+                },
+                EstadoTransaccion::Finalize => Ok(())
             },
         }
     }
@@ -141,10 +142,16 @@ impl CoordinadorTransaccion {
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
 
-        self.send_and_wait(
+        let res = self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
-        )
+        );
+        self.log
+            .write()
+            .expect("Error al tomar lock del log en Coordinador")
+            .insertar(transaccion.finalize());
+        println!("[COORDINADOR]: Finalize de transaccion {}", transaccion.id);
+        res
     }
 
     // TODO: Documentacion?? Es privada
@@ -160,10 +167,16 @@ impl CoordinadorTransaccion {
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = MensajeTransaccion::new(CodigoTransaccion::ABORT, self.id, id_op);
 
-        self.send_and_wait(
+        let res = self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
-        )
+        );
+        self.log
+            .write()
+            .expect("Error al tomar lock del log en Coordinador")
+            .insertar(transaccion.finalize());
+        println!("[COORDINADOR]: Finalize de transaccion {}", transaccion.id);
+        res
     }
 
     // TODO: Documentacion?? Es privada

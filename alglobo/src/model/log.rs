@@ -21,6 +21,7 @@ pub enum EstadoTransaccion {
     Prepare,
     Commit,
     Abort,
+    Finalize,
 }
 
 /// Representa una transaccion. Contiene información sobre el pago actual y
@@ -68,6 +69,12 @@ impl Transaccion {
     /// Cambiar el estado de la transacción a Abort.
     pub fn abort(&mut self) -> &Self {
         self.estado = EstadoTransaccion::Abort;
+        self
+    }
+
+    /// Cambiar el estado de la transacción a Finalize.
+    pub fn finalize(&mut self) -> &Self {
+        self.estado = EstadoTransaccion::Finalize;
         self
     }
 }
@@ -138,6 +145,7 @@ impl Log {
             EstadoTransaccion::Commit => "COMMIT",
             EstadoTransaccion::Abort => "ABORT",
             EstadoTransaccion::Prepare => "PREPARE",
+            EstadoTransaccion::Finalize => "FINALIZE",
         };
 
         format!("{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado)
@@ -145,7 +153,7 @@ impl Log {
 
     // TODO: Documentacion?? Es privada
     fn leer_archivo(&mut self) {
-        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE)$")
+        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE|FINALIZE)$")
         .expect("Error al crear la regex, posiblemente es invalida");
         let reader = BufReader::new(&self.archivo);
 
@@ -178,6 +186,7 @@ impl Log {
             "COMMIT" => EstadoTransaccion::Commit,
             "ABORT" => EstadoTransaccion::Abort,
             "PREPARE" => EstadoTransaccion::Prepare,
+            "FINALIZE" => EstadoTransaccion::Finalize,
             _ => panic!("Estado erroneo"),
         };
 
