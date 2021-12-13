@@ -138,7 +138,7 @@ impl Aplicacion {
             if coordinador.submit(&mut transaccion).is_err() {
                 //Agregar a la lista de falladas
                 println!(
-                    "[APLICACION]: El pago de id {} ha fallado",
+                    "[Aplicacion]: El pago de id {} ha fallado",
                     &transaccion.id_pago
                 );
 
@@ -184,7 +184,7 @@ impl Aplicacion {
                 if coordinador.submit(&mut transaccion).is_err() {
                     //Agregar a la lista de falladas
                     println!(
-                        "[APLICACION]: El pago de id {} ha fallado",
+                        "[Aplicacion]: El pago de id {} ha fallado",
                         &transaccion.id_pago
                     );
                     if let Some(p) = transaccion.get_pago() { parser_fallidos.escribir_fallido(p) }

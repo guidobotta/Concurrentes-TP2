@@ -126,7 +126,7 @@ impl CoordinadorTransaccion {
         // Mensaje esperado
         let esperado = MensajeTransaccion::new(CodigoTransaccion::READY, self.id, id_op); // TODO: PASAR ESTO AL PARSER
 
-        self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado)
+        self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado, false)
     }
 
     // TODO: Documentacion?? Es privada
@@ -144,6 +144,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
+            true
         )
     }
 
@@ -163,6 +164,7 @@ impl CoordinadorTransaccion {
         self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
+            true
         )
     }
 
@@ -173,6 +175,7 @@ impl CoordinadorTransaccion {
         &mut self,
         mensajes: Vec<MensajeTransaccion>,
         esperado: MensajeTransaccion,
+        mensaje_critico: bool
     ) -> Resultado<()> {
         loop {
             let respuestas;
@@ -196,8 +199,14 @@ impl CoordinadorTransaccion {
                 |respuestas| respuestas.iter().any(Option::is_none),
             );
 
-            match &respuestas {
-                Ok(val) if !val.1.timed_out() => {}
+            let mensajes_esperados = match &respuestas {
+                Ok(val) if !val.1.timed_out() => {
+                    respuestas
+                    .expect("Error al tomar lock de respuestas en Coordinador")
+                    .0
+                    .iter()
+                    .all(|opt| opt.as_ref().map_or(false, |r| r == &esperado))
+                }
                 _ => {
                     println!(
                         "[Coordinador] Timeout de recepcion a webservices, reintentando id {}",
@@ -207,17 +216,13 @@ impl CoordinadorTransaccion {
                 }
             };
 
-            if !respuestas
-                .expect("Error al tomar lock de respuestas en Coordinador")
-                .0
-                .iter()
-                .all(|opt| opt.as_ref().map_or(false, |r| r == &esperado))
-            {
+            if mensajes_esperados { break; }
+            else if mensaje_critico { continue; }
+            else {
                 return Err(ErrorApp::Interno(ErrorInterno::new(
                     "Respuesta no esperada",
                 )));
             }
-            break;
         }
 
         Ok(())
