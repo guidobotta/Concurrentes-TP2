@@ -16,7 +16,7 @@ const TIMEOUT_WEBSERVICES: Duration = Duration::from_secs(4);
 pub struct CoordinadorTransaccion {
     log: Arc<RwLock<Log>>,
     protocolo: ProtocoloTransaccion,
-    responses: Arc<(Mutex<Vec<Option<MensajeTransaccion>>>, Condvar)>,
+    respuestas: Arc<(Mutex<Vec<Option<MensajeTransaccion>>>, Condvar)>,
     id: usize,
     destinatarios: Vec<String>,
     continuar: Arc<AtomicBool>,
@@ -28,20 +28,20 @@ impl CoordinadorTransaccion {
     /// Recibe el id asociado al nodo de alglobo y un Log.
     pub fn new(id: usize, log: Arc<RwLock<Log>>) -> Resultado<Self> {
         let protocolo = ProtocoloTransaccion::new(DNS::direccion_alglobo(&id))?;
-        let responses = Arc::new((Mutex::new(vec![None; WEBSERVICES]), Condvar::new()));
+        let respuestas = Arc::new((Mutex::new(vec![None; WEBSERVICES]), Condvar::new()));
         let continuar = Arc::new(AtomicBool::new(true));
         let ret = CoordinadorTransaccion {
             log,
             protocolo: protocolo.clone()?,
-            responses: responses.clone(),
+            respuestas: respuestas.clone(),
             id,
             destinatarios: vec![0, 1, 2]
                 .iter()
-                .map(|id| DNS::direccion_webservice(&id))
+                .map(|id| DNS::direccion_webservice(id))
                 .collect(), // TODO: cambiar esto
             continuar: continuar.clone(),
             respondedor: Some(thread::spawn(move || {
-                CoordinadorTransaccion::responder(protocolo, responses, continuar)
+                CoordinadorTransaccion::responder(protocolo, respuestas, continuar)
             })),
         };
 
@@ -70,7 +70,7 @@ impl CoordinadorTransaccion {
                 EstadoTransaccion::Commit => self.commit(transaccion),
                 EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
-                    return Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")));
+                    Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")))
                 }
             },
         }
@@ -93,7 +93,7 @@ impl CoordinadorTransaccion {
             .write()
             .expect("Error al tomar lock del log en Coordinador")
             .insertar(transaccion.prepare());
-        println!("[COORDINADOR]: Prepare de transaccion {}", transaccion.id);
+        println!("[Coordinador]: Prepare de transaccion {}", transaccion.id);
 
         let id_op = transaccion.id;
         let pago = transaccion
@@ -135,7 +135,7 @@ impl CoordinadorTransaccion {
             .write()
             .expect("Error al tomar lock del log en Coordinador")
             .insertar(transaccion.commit());
-        println!("[COORDINADOR]: Commit de transaccion {}", transaccion.id);
+        println!("[Coordinador]: Commit de transaccion {}", transaccion.id);
         let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
@@ -153,7 +153,7 @@ impl CoordinadorTransaccion {
             .write()
             .expect("Error al tomar lock del log en Coordinador")
             .insertar(transaccion.abort());
-        println!("[COORDINADOR]: Abort de transaccion {}", transaccion.id);
+        println!("[Coordinador]: Abort de transaccion {}", transaccion.id);
 
         let id_op = transaccion.id;
 
@@ -175,40 +175,40 @@ impl CoordinadorTransaccion {
         esperado: MensajeTransaccion,
     ) -> Resultado<()> {
         loop {
-            let responses;
+            let respuestas;
             *self
-                .responses
+                .respuestas
                 .0
                 .lock()
-                .expect("Error al tomar lock de responses en Coordinador") =
+                .expect("Error al tomar lock de respuestas en Coordinador") =
                 vec![None; WEBSERVICES];
 
             for (idx, mensaje) in mensajes.iter().enumerate() {
                 self.protocolo
-                    .enviar(&mensaje, self.destinatarios[idx].clone())?;
+                    .enviar(mensaje, self.destinatarios[idx].clone())?;
             }
-            responses = self.responses.1.wait_timeout_while(
-                self.responses
+            respuestas = self.respuestas.1.wait_timeout_while(
+                self.respuestas
                     .0
                     .lock()
-                    .expect("Error al tomar lock de responses en Coordinador"),
+                    .expect("Error al tomar lock de respuestas en Coordinador"),
                 TIMEOUT_WEBSERVICES,
-                |responses| responses.iter().any(Option::is_none),
+                |respuestas| respuestas.iter().any(Option::is_none),
             );
 
-            match &responses {
+            match &respuestas {
                 Ok(val) if !val.1.timed_out() => {}
                 _ => {
                     println!(
-                        "[COORDINADOR] Timeout de recepcion a webservices, reintentando id {}",
+                        "[Coordinador] Timeout de recepcion a webservices, reintentando id {}",
                         esperado.id_op
                     );
                     continue;
                 }
             };
 
-            if !responses
-                .expect("Error al tomar lock de responses en Coordinador")
+            if !respuestas
+                .expect("Error al tomar lock de respuestas en Coordinador")
                 .0
                 .iter()
                 .all(|opt| opt.as_ref().map_or(false, |r| r == &esperado))
@@ -226,7 +226,7 @@ impl CoordinadorTransaccion {
     // TODO: Documentacion?? Es privada
     fn responder(
         mut protocolo: ProtocoloTransaccion,
-        responses: Arc<(Mutex<Vec<Option<MensajeTransaccion>>>, Condvar)>,
+        respuestas: Arc<(Mutex<Vec<Option<MensajeTransaccion>>>, Condvar)>,
         continuar: Arc<AtomicBool>,
     ) {
         while continuar.load(Ordering::Relaxed) {
@@ -237,17 +237,17 @@ impl CoordinadorTransaccion {
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {
                 CodigoTransaccion::READY | CodigoTransaccion::COMMIT | CodigoTransaccion::ABORT => {
-                    //println!("[COORDINATOR] recibí READY de {}", id_emisor);
-                    responses
+                    //println!("[Coordinador] recibí READY de {}", id_emisor);
+                    respuestas
                         .0
                         .lock()
-                        .expect("Error al tomar lock de responses en Coordinador")[id_emisor] =
+                        .expect("Error al tomar lock de respuestas en Coordinador")[id_emisor] =
                         Some(mensaje);
-                    responses.1.notify_all();
+                    respuestas.1.notify_all();
                 }
                 _ => {
                     println!(
-                        "[COORDINADOR]: Recibí algo que no puedo interpretar de {}",
+                        "[Coordinador]: Recibí algo que no puedo interpretar de {}",
                         id_emisor
                     );
                 }

@@ -99,23 +99,19 @@ impl Aplicacion {
                 {
                     Some(t) => t,
                     None => {
-                        println!("No se encontro nada");
+                        println!("[Aplicacion] No se encontraron transacciones previas en el archivo de log");
                         continue;
                     }
                 };
                 prox_pago = transaccion.id_pago_prox;
                 transaccion.pago = match parseador.parsear(Some(transaccion.id_pago)).ok() {
                     Some(Some(p)) => Some(p),
-                    _ => {
-                        panic!(
-                            "ERROR: El log de transacciones no matchea con el archivo de entrada"
-                        )
-                    }
+                    _ => panic!("[Aplicacion] El log de transacciones no matchea con el archivo de entrada")
                 };
             } else if let Ok(comando) = receptor.try_recv() {
                 let id_reintento = match comando {
-                    Comando::FINALIZAR => return Ok(EstadoApp::Finalizar),
-                    Comando::REINTENTAR { id } => id,
+                    Comando::Finalizar => return Ok(EstadoApp::Finalizar),
+                    Comando::Reintentar { id } => id,
                 };
                 transaccion = match Aplicacion::procesar_comando(
                     id_reintento,
@@ -134,9 +130,7 @@ impl Aplicacion {
                 transaccion.pago = match parseador.parsear(Some(prox_pago)).ok() {
                     Some(None) => return Ok(EstadoApp::FinEntrada),
                     Some(p) => p,
-                    _ => {
-                        panic!("Algo malo paso")
-                    }
+                    _ => panic!("[Aplicacion] Error al parsear del archivo de entrada")
                 };
                 prox_pago += 1;
             }
@@ -147,9 +141,8 @@ impl Aplicacion {
                     "[APLICACION]: El pago de id {} ha fallado",
                     &transaccion.id_pago
                 );
-                transaccion
-                    .get_pago()
-                    .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
+
+                if let Some(p) = transaccion.get_pago() { parser_fallidos.escribir_fallido(p) }
             }
         }
 
@@ -170,14 +163,14 @@ impl Aplicacion {
             .read()
             .expect("Error al tomar lock del log en Aplicacion")
             .ultima_transaccion()
-            .and_then(|t| Some(t.id_pago_prox))
+            .map(|t| t.id_pago_prox)
             .unwrap_or(1);
 
         while lider.soy_lider() {
             if let Ok(comando) = receptor.recv() {
                 let id_reintento = match comando {
-                    Comando::FINALIZAR => return Ok(EstadoApp::Finalizar),
-                    Comando::REINTENTAR { id } => id,
+                    Comando::Finalizar => return Ok(EstadoApp::Finalizar),
+                    Comando::Reintentar { id } => id,
                 };
                 transaccion = match Aplicacion::procesar_comando(
                     id_reintento,
@@ -194,9 +187,7 @@ impl Aplicacion {
                         "[APLICACION]: El pago de id {} ha fallado",
                         &transaccion.id_pago
                     );
-                    transaccion
-                        .get_pago()
-                        .and_then(|p| Some(parser_fallidos.escribir_fallido(p)));
+                    if let Some(p) = transaccion.get_pago() { parser_fallidos.escribir_fallido(p) }
                 }
             }
         }
@@ -214,7 +205,7 @@ impl Aplicacion {
         // TODO: LE CAMBIE EL ? POR UNWRAP()
         let mut transaccion = log
             .read()
-            .unwrap()
+            .expect("Error al tomar lock del log en Aplicacion")
             .nueva_transaccion(id_reintento, prox_pago); //Le pasamos prox_pago o que se fije en la ultima transaccion
 
         match parser.parsear(id_reintento) {

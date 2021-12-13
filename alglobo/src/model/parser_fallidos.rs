@@ -35,17 +35,20 @@ impl ParserFallidos {
         let lector = io::BufReader::new(&self.archivo);
         let mut pago = None;
 
-        let lines = lector.lines().map(|line| {
-            let linea = line.unwrap();
+        let lines = lector.lines().map(|linea| {
+            let linea = linea.expect("Error al leer del archivo de fallidos");
 
             if let Some(cap) = self.matcher.captures(&linea) {
-                if cap[1].parse::<usize>().unwrap() == id {
-                    println!("[Parser Fallidos] Reintento de pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
+
+                //Los parseos no deberian fallar si ya se paso la regex
+
+                if cap[1].parse::<usize>().expect("Error al parsear id de pago") == id {
+                    println!("[ParserFallidos] Reintento de pago de id '{}' con un monto de aerolinea '{}' y monto de hotel de '{}'",
                         &cap[1], &cap[2], &cap[3]);
                     pago = Some(Pago::new(
-                        cap[1].parse::<usize>().unwrap(),
-                        cap[2].parse::<f64>().unwrap(),
-                        cap[3].parse::<f64>().unwrap(),
+                        cap[1].parse::<usize>().expect("Error al parsear id de pago"),
+                        cap[2].parse::<f64>().expect("Error al parsear monto de aerolinea"),
+                        cap[3].parse::<f64>().expect("Error al parsear monto de hotel"),
                     ));
 
                     "".to_string()
@@ -58,7 +61,8 @@ impl ParserFallidos {
         }).collect::<Vec<String>>().join("");
 
         if pago.is_some() {
-            fs::write("./files/fallidos.csv", lines).expect("Can't write"); // TODO: ver esto, cambiar el path o si se puede hacer distinto
+            // TODO: ver esto, cambiar el path o si se puede hacer distinto
+            fs::write("./files/fallidos.csv", lines).expect("Error al escribir en el archivo de fallidos"); 
         }
         Ok(pago)
     }

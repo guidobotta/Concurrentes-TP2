@@ -50,7 +50,9 @@ impl Parser {
                 Some(value) => value,
             };
 
-            self.posicion = cap[1].parse::<usize>().unwrap();
+            //Los parse no pueden fallar porque pasaron la regex
+            
+            self.posicion = cap[1].parse::<usize>().expect("Error al parsear id de pago");
             if let Some(id_buscado) = id {
                 if id_buscado > self.posicion {
                     continue;
@@ -63,8 +65,8 @@ impl Parser {
             //Si pasa la regex sabemos que el casteo no fallara.
             let pago = Pago::new(
                 self.posicion,
-                cap[2].parse::<f64>().unwrap(),
-                cap[3].parse::<f64>().unwrap(),
+                cap[2].parse::<f64>().expect("Error al parsear monto de aerolinea"),
+                cap[3].parse::<f64>().expect("Error al parsear monto de hotel"),
             );
 
             return Ok(Some(pago));

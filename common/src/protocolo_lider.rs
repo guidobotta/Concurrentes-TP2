@@ -106,7 +106,7 @@ impl ProtocoloLider {
         if recibido == 0 {
             return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
         }
-        MensajeLider::decodificar(&String::from_utf8(buffer[..recibido].to_vec()).unwrap())
+        MensajeLider::decodificar(&String::from_utf8(buffer[..recibido].to_vec())?)
     }
 
     /// Devuelve una copia de ProtocoloLider

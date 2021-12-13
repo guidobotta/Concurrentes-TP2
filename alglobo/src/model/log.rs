@@ -50,7 +50,7 @@ impl Transaccion {
 
     // TODO: Documentacion
     pub fn get_pago(&self) -> Option<Pago> {
-        self.pago.as_ref().and_then(|p| Some(p.clone()))
+        self.pago.as_ref().cloned()
     }
 
     /// Cambiar el estado de la transacción a Prepare.
@@ -109,15 +109,14 @@ impl Log {
         //Luego habra que cargarle los demas campos
         let id = self
             .ultima_trans
-            .as_ref()
-            .and_then(|t| Some(t.id))
+            .as_ref().map(|t| t.id)
             .unwrap_or(0);
         Transaccion::new(id + 1, id_pago, id_prox_pago, EstadoTransaccion::Prepare)
     }
 
     /// Recibe un id y devuelve una transacción si lo contiene o None si no.
     pub fn obtener(&self, id: &usize) -> Option<Transaccion> {
-        self.log.get(id).and_then(|t| Some(t.clone()))
+        self.log.get(id).cloned()
     }
 
     /// Inserta una transacción en el log de transacciones.
@@ -129,7 +128,7 @@ impl Log {
         }
         let salida = self.formatear_transaccion(transaccion);
         self.log.insert(transaccion.id, transaccion.clone());
-        writeln!(self.archivo, "{}", salida).unwrap();
+        writeln!(self.archivo, "{}", salida).expect("Error al escribir en el archivo de log");
         self.ultima_trans = Some(transaccion.clone());
     }
 
@@ -146,24 +145,26 @@ impl Log {
 
     // TODO: Documentacion?? Es privada
     fn leer_archivo(&mut self) {
-        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE)$").unwrap();
+        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE)$")
+        .expect("Error al crear la regex, posiblemente es invalida");
         let reader = BufReader::new(&self.archivo);
 
         let mut ultimo_id = 0;
 
         for linea in reader.lines() {
-            let linea_unwrap = &linea.unwrap();
-            let cap = match matcher.captures(linea_unwrap) {
+            let linea = &linea.expect("Error al leer del archivo de log");
+            let cap = match matcher.captures(linea) {
                 None => continue,
                 Some(value) => value,
             };
-            let transaccion = self.parsear_transaccion(cap).unwrap();
+            //No deberia fallar si ya paso la regex
+            let transaccion = self.parsear_transaccion(cap).expect("Error al parsear transaccion");
             self.siguiente_id = std::cmp::max(self.siguiente_id - 1, transaccion.id) + 1;
             ultimo_id = transaccion.id;
             self.log.insert(transaccion.id, transaccion);
         }
 
-        self.ultima_trans = self.log.get(&ultimo_id).and_then(|t| Some(t.clone()));
+        self.ultima_trans = self.log.get(&ultimo_id).cloned();
     }
 
     // TODO: Documentacion?? Es privada

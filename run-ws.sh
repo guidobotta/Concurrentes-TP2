@@ -24,5 +24,5 @@ done
 for i in `seq 0 $REPLICAS`
 do
     echo "Levanto Replica con id $i - $(($i+1))/$(($REPLICAS + 1))"
-    gnome-terminal --title="AlGlobo${i}" --geometry "100x20+960+$(($i*1080/($REPLICAS+1)))" -- ./1-alglobo.sh ./files/1.csv ./files/fallidos.csv $i
+    gnome-terminal --title="AlGlobo${i}" --geometry "100x20+960+$(($i*1080/($REPLICAS+1)))" -- ./1-alglobo.sh $i
 done

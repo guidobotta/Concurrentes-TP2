@@ -52,7 +52,7 @@ impl MensajeTransaccion {
     pub fn decodificar(mensaje_codificado: &String) -> Resultado<MensajeTransaccion> {
         let parseado = mensaje_codificado.split(' ').collect::<Vec<&str>>();
         let codigo = match parseado[0] {
-            "PREPARE" => CodigoTransaccion::PREPARE { monto: parseado[3].parse::<f64>().unwrap() },
+            "PREPARE" => CodigoTransaccion::PREPARE { monto: parseado[3].parse::<f64>()? },
             "COMMIT" => CodigoTransaccion::COMMIT,
             "ABORT" => CodigoTransaccion::ABORT,
             "READY" => CodigoTransaccion::READY,
@@ -110,7 +110,7 @@ impl ProtocoloTransaccion {
         if recibido == 0 {
             return Err(ErrorApp::Interno(ErrorInterno::new("Timeout en recepcion")));
         }
-        MensajeTransaccion::decodificar(&String::from_utf8(buffer[..recibido].to_vec()).unwrap())
+        MensajeTransaccion::decodificar(&String::from_utf8(buffer[..recibido].to_vec())?)
     }
 
     /// Devuelve una copia de ProtocoloTransaccion

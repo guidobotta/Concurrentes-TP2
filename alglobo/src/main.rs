@@ -9,7 +9,7 @@ use std::sync::mpsc::channel;
 // TODO: Documentacion?? Es privada
 fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<()> {
     let parseador = Parser::new(path_pagos)?;
-    let lider = EleccionLider::new(id);
+    let lider = EleccionLider::new(id)?;
     let (enviador, receptor) = channel::<Comando>();
     let app = Aplicacion::new(id, lider, parseador, receptor)?;
 
@@ -22,7 +22,7 @@ fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<(
             if let Err(e) = enviador.send(comando.clone()) {
                 println!("{}", e);
             }
-            if let Comando::FINALIZAR = comando {
+            if let Comando::Finalizar = comando {
                 break;
             }
         } else {

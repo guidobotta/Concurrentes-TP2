@@ -1,5 +1,6 @@
 use super::env::Envs;
 use common::dns::DNS;
+use common::error::Resultado;
 use common::protocolo_transaccion::{CodigoTransaccion, MensajeTransaccion, ProtocoloTransaccion};
 use rand::Rng;
 use std::collections::HashMap;
@@ -34,36 +35,36 @@ impl WebService {
     /// - 0 para la aerolinea
     /// - 1 para el hotel
     /// - 2 para el banco
-    pub fn new(id: usize) -> Self {
-        WebService {
+    pub fn new(id: usize) -> Resultado<Self> {
+        Ok(WebService {
             log: HashMap::new(),
-            protocolo: ProtocoloTransaccion::new(DNS::direccion_webservice(&id)).unwrap(),
+            protocolo: ProtocoloTransaccion::new(DNS::direccion_webservice(&id))?,
             id,
             envs: Envs::get_envs("./files/env.json"),
-        }
+        })
     }
 
     /// Corre el flujo principal del programa cíclicamente.
     pub fn run(&mut self) {
         loop {
-            let mensaje = self.protocolo.recibir(None).unwrap(); // TODO: revisar el timeout
-
-            match mensaje.codigo {
-                CodigoTransaccion::PREPARE { monto } => self.responder_prepare(mensaje, monto),
-                CodigoTransaccion::COMMIT => self.responder_commit(mensaje),
-                CodigoTransaccion::ABORT => self.responder_abort(mensaje),
-                _ => println!(
-                    "[WEBSERVICE] Recibí algo que no puedo interpretar de {}",
-                    mensaje.id_emisor
-                ),
-            }
+            if let Ok(mensaje) = self.protocolo.recibir(None) {
+                match mensaje.codigo {
+                    CodigoTransaccion::PREPARE { monto } => self.responder_prepare(mensaje, monto),
+                    CodigoTransaccion::COMMIT => self.responder_commit(mensaje),
+                    CodigoTransaccion::ABORT => self.responder_abort(mensaje),
+                    _ => println!(
+                        "[WebService] Recibí algo que no puedo interpretar de {}",
+                        mensaje.id_emisor
+                    )
+                }
+            }             
         }
     }
 
     // TODO: Documentacion?? Es privada
     fn responder_prepare(&mut self, mensaje: MensajeTransaccion, monto: f64) {
         println!(
-            "[WEBSERVICE] Recibí PREPARE de {} para el pago {} con monto {}",
+            "[WebService] Recibí PREPARE de {} para el pago {} con monto {}",
             mensaje.id_emisor, mensaje.id_op, monto
         );
         let respuesta_ready =
@@ -110,7 +111,7 @@ impl WebService {
     // TODO: Documentacion?? Es privada
     fn responder_commit(&mut self, mensaje: MensajeTransaccion) {
         println!(
-            "[WEBSERVICE] Recibí COMMIT de {} para el pago {}",
+            "[WebService] Recibí COMMIT de {} para el pago {}",
             mensaje.id_emisor, mensaje.id_op
         );
 
@@ -126,7 +127,7 @@ impl WebService {
                     self.insertar_y_enviar(EstadoServicio::Commit, respuesta, mensaje.id_emisor)
                 }
                 EstadoServicio::Abort => {
-                    println!("[WEBSERVICE] Error inesperado: llego commit con estado abort")
+                    println!("[WebService] Error inesperado: llego commit con estado abort")
                 }
             }
         };
@@ -135,7 +136,7 @@ impl WebService {
     // TODO: Documentacion?? Es privada
     fn responder_abort(&mut self, mensaje: MensajeTransaccion) {
         println!(
-            "[WEBSERVICE] Recibí ABORT de {} para el pago {}",
+            "[WebService] Recibí ABORT de {} para el pago {}",
             mensaje.id_emisor, mensaje.id_op
         );
 
@@ -148,7 +149,7 @@ impl WebService {
                     self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor);
                 }
                 EstadoServicio::Commit => {
-                    println!("[WEBSERVICE] Error inesperado: llego abort con estado commit")
+                    println!("[WebService] Error inesperado: llego abort con estado commit")
                 }
                 EstadoServicio::Abort => {
                     self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor)
@@ -172,10 +173,10 @@ impl WebService {
         self.log.insert(mensaje.id_op, estado);
         let direccion = DNS::direccion_alglobo(&id_emisor);
 
-        println!("[WEBSERVICE] Envío {:?} a {}", mensaje.codigo, id_emisor);
+        println!("[WebService] Envío {:?} a {}", mensaje.codigo, id_emisor);
         let enviado = self.protocolo.enviar(&mensaje, direccion);
         if enviado.is_err() {
-            println!("[WEBSERVICE] Error: Fallo al enviar mensaje")
+            println!("[WebService] Error: Fallo al enviar mensaje")
         }
     }
 

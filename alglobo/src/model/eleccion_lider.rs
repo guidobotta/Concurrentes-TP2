@@ -1,6 +1,7 @@
 use common::dns::DNS;
 use common::error::Resultado;
 use common::protocolo_lider::{CodigoLider, MensajeLider, ProtocoloLider};
+use std::sync::atomic::{Ordering, AtomicBool};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -18,22 +19,22 @@ pub struct EleccionLider {
     protocolo: ProtocoloLider,
     id_lider: Arc<(Mutex<Option<usize>>, Condvar)>,
     obtuve_ok: Arc<(Mutex<bool>, Condvar)>,
-    stop: Arc<(Mutex<bool>, Condvar)>,
+    stop: Arc<AtomicBool>,
     respondedor: Option<JoinHandle<()>>,
 }
 
 impl EleccionLider {
     /// Devuelve una instancia de EleccionLider.
     /// Recibe el id asociado al nodo de alglobo.
-    pub fn new(id: usize) -> EleccionLider {
-        let protocolo = ProtocoloLider::new(DNS::direccion_lider(&id)).unwrap();
+    pub fn new(id: usize) -> Resultado<EleccionLider> {
+        let protocolo = ProtocoloLider::new(DNS::direccion_lider(&id))?;
 
         let mut ret = EleccionLider {
             id,
             protocolo,
             id_lider: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             obtuve_ok: Arc::new((Mutex::new(false), Condvar::new())),
-            stop: Arc::new((Mutex::new(false), Condvar::new())),
+            stop: Arc::new(AtomicBool::new(false)),
             respondedor: None,
         };
 
@@ -41,18 +42,17 @@ impl EleccionLider {
         ret.respondedor = Some(thread::spawn(move || clone.responder()));
 
         ret.buscar_nuevo_lider();
-        ret
+        Ok(ret)
     }
 
     // TODO: Documentacion
     pub fn bloquear_si_no_soy_lider(&self) -> bool {
-        self.id_lider
+        let _ = self.id_lider
             .1
-            .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
-                id_lider.is_none() || id_lider.unwrap() != self.id
-            })
-            .unwrap()
-            .unwrap();
+            .wait_while(self.id_lider.0.lock()
+            .expect("Error al tomar lock del id_lider en EleccionLider"), |id_lider| {
+                if let Some(id) = *id_lider {  id != self.id } else { false }
+            }).expect("Error al tomar lock del id_lider en EleccionLider");
 
         true
     }
@@ -63,63 +63,58 @@ impl EleccionLider {
     }
 
     // TODO: Documentacion
-    pub fn get_id_lider(&self) -> usize {
+    pub fn get_id_lider(&self) -> usize {    
         self.id_lider
             .1
-            .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
+            .wait_while(self.id_lider.0.lock()
+            .expect("Error al tomar lock del id_lider en EleccionLider"), |id_lider| {
                 id_lider.is_none()
-            })
-            .unwrap()
-            .unwrap()
+            }).expect("Error al tomar lock del id_lider en EleccionLider")
+            .expect("Se obtuvo un id None")
     }
 
     // TODO: Documentacion
     pub fn notificar_finalizacion(&mut self) {
         (0..TEAM_MEMBERS).for_each(|id| {
             if id != self.id {
-                self.enviar(CodigoLider::ELECCION, id).unwrap()
+                let _ = self.enviar(CodigoLider::ELECCION, id);
             }
         });
     }
 
     // TODO: Documentacion
     pub fn buscar_nuevo_lider(&mut self) {
-        if *self.stop.0.lock().unwrap() {
-            return;
+        if self.stop.load(Ordering::Relaxed) { return; }
+        
+        match self.id_lider.0.lock() {
+            Ok(mut lider) => {
+                if lider.is_none() { return; } // Ya se esta buscando lider
+                else { *lider = None }
+            },
+            Err(_) => panic!("Error al tomar el lock de id_lider en EleccionLider")
         }
-
-        if self.id_lider.0.lock().unwrap().is_none() {
-            // ya esta buscando lider
-            return;
-        }
-
-        println!("[ELECCION]: En busca de un lider");
-
-        *self.obtuve_ok.0.lock().unwrap() = false;
-        *self.id_lider.0.lock().unwrap() = None;
+        
+        *self.obtuve_ok.0.lock().expect("Error al tomar el lock de obtuve_ok en EleccionLider") = false;
 
         self.enviar_eleccion();
         let obtuve_ok = self.obtuve_ok.1.wait_timeout_while(
-            self.obtuve_ok.0.lock().unwrap(),
+            self.obtuve_ok.0.lock().expect("Error al tomar lock de obtuve_ok en EleccionLider"),
             TIMEOUT_LIDER,
             |got_it| !*got_it,
         );
 
-        if !*obtuve_ok.unwrap().0 {
+        //Si rompe, poner esto
+        if !*obtuve_ok.expect("Error al tomar el lock de obtuve_ok en EleccionLider").0 {
             self.anunciarme_lider()
         } else {
-            let _ = self
-                .id_lider
-                .1
-                .wait_while(self.id_lider.0.lock().unwrap(), |id_lider| {
-                    id_lider.is_none()
-                });
+            let _ = self.get_id_lider();
         }
     }
 
     // TODO: Documentacion
     pub fn finalizar(&mut self) {
-        *self.stop.0.lock().unwrap() = true;
+        //*self.stop.0.lock().expect("Error al tomar lock de stop en EleccionLider") = true;
+        self.stop.store(true, Ordering::Relaxed);
         self.notificar_finalizacion();
         if let Some(res) = self.respondedor.take() {
             let _ = res.join();
@@ -142,24 +137,32 @@ impl EleccionLider {
     fn enviar_eleccion(&mut self) {
         thread::sleep(Duration::from_millis(500)); // TODO: CAMBIAR ESTO
         ((self.id + 1)..TEAM_MEMBERS)
-            .for_each(|id| self.enviar(CodigoLider::ELECCION, id).unwrap());
+            .for_each(|id| {
+                let _ = self.enviar(CodigoLider::ELECCION, id);
+            });
     }
 
     fn anunciarme_lider(&mut self) {
-        println!("[ELECCION]: Me anuncio como lider");
+        println!("[Eleccion]: Me anuncio como lider");
+        
         (0..TEAM_MEMBERS).for_each(|id| {
             if id != self.id {
-                self.enviar(CodigoLider::COORDINADOR, id).unwrap()
+                let _ = self.enviar(CodigoLider::COORDINADOR, id);
             }
         });
+        
+        self.set_id_lider(Some(self.id), true);
+    }
 
-        *self.id_lider.0.lock().unwrap() = Some(self.id);
-        self.id_lider.1.notify_all();
+    fn set_id_lider(&mut self, val: Option<usize>, notificar: bool) {
+        *self.id_lider.0.lock().expect("Error al tomar el lock de id_lider en EleccionLider") = val;
+        if notificar {self.id_lider.1.notify_all();}
     }
 
     fn responder(&mut self) {
         let mut threads = Vec::new();
-        while !*self.stop.0.lock().unwrap() {
+
+        while !self.stop.load(Ordering::Relaxed) { //TODO: Cambiar a AtomicBool
             // TODO: revisar el timeout
             if let Ok(mensaje) = self.protocolo.recibir(Some(TIMEOUT_MENSAJE)) {
                 let id_emisor = mensaje.id_emisor;
@@ -193,9 +196,9 @@ impl EleccionLider {
     }
 
     fn recibir_election(&mut self, threads: &mut Vec<JoinHandle<()>>, id_emisor: usize) {
-        println!("[ELECCION {}] recibí ELECCION de {}", self.id, id_emisor);
+        println!("[Eleccion {}] recibí ELECCION de {}", self.id, id_emisor);
         if id_emisor < self.id {
-            self.enviar(CodigoLider::OK, id_emisor).unwrap();
+            let _ = self.enviar(CodigoLider::OK, id_emisor);
 
             let mut me = self.clone();
             threads.push(thread::spawn(move || me.buscar_nuevo_lider())); // TODO: revisar esto
@@ -203,28 +206,28 @@ impl EleccionLider {
     }
 
     fn recibir_coordinador(&mut self, threads: &mut Vec<JoinHandle<()>>, id_emisor: usize) {
-        println!("[ELECCION]: El nuevo lider es {}", id_emisor);
-        *self.id_lider.0.lock().unwrap() = Some(id_emisor);
-        self.id_lider.1.notify_all();
+        println!("[Eleccion]: El nuevo lider es {}", id_emisor);
 
+        self.set_id_lider(Some(id_emisor), true);
         let mut me = self.clone();
         threads.push(thread::spawn(move || me.mantener_vivo())); // TODO: revisar esto
     }
 
     fn recibir_verificar(&mut self, id_emisor: usize) {
         if self.soy_lider() {
-            self.enviar(CodigoLider::OK, id_emisor).unwrap()
+            let _ = self.enviar(CodigoLider::OK, id_emisor);
         }
     }
 
     fn mantener_vivo(&mut self) {
         while !self.soy_lider() {
+            println!("[Eleccion]: Envío VERIFICAR al lider de ID {}", self.get_id_lider());
             if self
                 .enviar(CodigoLider::VERIFICAR, self.get_id_lider())
                 .is_ok()
             {
                 thread::sleep(TIMEOUT_MANTENER_VIVO);
-            };
+            }
         }
     }
 
