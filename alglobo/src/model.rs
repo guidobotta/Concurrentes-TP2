@@ -1,5 +1,6 @@
 pub mod aplicacion;
 pub mod comando;
+pub mod config;
 pub mod coordinador_transaccion;
 pub mod eleccion_lider;
 pub mod log;

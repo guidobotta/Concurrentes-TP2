@@ -295,7 +295,7 @@ impl EleccionLider {
             .expect("Error al tomar lock del id_lider en EleccionLider");
     }
 
-    //Raro.
+    /// Envia mensaje VERIFICAR al lider actual
     fn mantener_vivo(&mut self) {
         loop {
             self.esperar_mientras_sea_lider();

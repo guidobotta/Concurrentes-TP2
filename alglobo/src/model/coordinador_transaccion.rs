@@ -56,7 +56,7 @@ impl CoordinadorTransaccion {
         }
     }
 
-    // TODO: Documentacion
+    /// Recibe una transaccion y la procesa
     pub fn submit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         let trans_en_log = self
             .log

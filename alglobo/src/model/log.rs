@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{BufReader, Write};
 
+use super::config::Config;
 use super::pago::Pago;
 
 /// EstadoTransaccion representa el estado de la transaccion.
@@ -90,13 +91,13 @@ pub struct Log {
 impl Log {
     /// Genera una instancia de la clase.
     /// Recibe un path donde dicho archivo debe ser construido.
-    pub fn new(path: String) -> Resultado<Self> {
+    pub fn new() -> Resultado<Self> {
         let archivo = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .append(true)
             .create(true)
-            .open(path)?;
+            .open(Config::ruta_logs())?;
 
         let mut log = Log {
             archivo,

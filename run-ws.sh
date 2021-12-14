@@ -14,6 +14,8 @@ fi
 
 chmod +x 1-alglobo.sh
 chmod +x 2-webservices.sh
+chmod +x nodo-alglobo.sh
+chmod +x nodo-webservice.sh
 
 for j in `seq 0 2`
 do

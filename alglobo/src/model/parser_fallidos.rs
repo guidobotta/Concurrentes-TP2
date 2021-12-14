@@ -1,3 +1,4 @@
+use super::config::Config;
 use super::pago::Pago;
 use common::error::Resultado;
 use regex::Regex;
@@ -14,15 +15,14 @@ pub struct ParserFallidos {
 
 impl ParserFallidos {
     /// Devuelve una instancia de ParserFallidos.
-    /// Recibe la ruta del archivo a ser procesado.
-    pub fn new(path: String) -> Resultado<Self> {
+    pub fn new() -> Resultado<Self> {
         Ok(ParserFallidos {
             archivo: fs::OpenOptions::new()
                 .write(true)
                 .read(true)
                 .append(true)
                 .create(true)
-                .open(path)?,
+                .open(Config::ruta_fallidos())?,
             matcher: Regex::new(r"^(\d+),(\d+\.\d{2}),(\d+\.\d{2})$")?,
         })
     }
@@ -61,8 +61,7 @@ impl ParserFallidos {
         }).collect::<Vec<String>>().join("");
 
         if pago.is_some() {
-            // TODO: ver esto, cambiar el path o si se puede hacer distinto
-            fs::write("./files/fallidos.csv", lines)
+            fs::write(Config::ruta_fallidos(), lines)
                 .expect("Error al escribir en el archivo de fallidos");
         }
         Ok(pago)

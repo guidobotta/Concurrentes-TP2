@@ -6,7 +6,7 @@ use model::eleccion_lider::EleccionLider;
 use model::parser::Parser;
 use std::sync::mpsc::channel;
 
-fn procesar(id: usize, path_pagos: String, path_fallidos: String) -> Resultado<()> {
+fn procesar(id: usize, path_pagos: String) -> Resultado<()> {
     let parseador = Parser::new(path_pagos)?;
     let lider = EleccionLider::new(id)?;
     let (enviador, receptor) = channel::<Comando>();
@@ -44,16 +44,8 @@ fn main() {
         }
     };
 
-    let path_fallidos = match std::env::args().nth(2) {
-        Some(path) => path,
-        None => {
-            println!("Se debe indicar un path a un archivo de pagos fallidos");
-            return;
-        }
-    };
-
     let id = match std::env::args()
-        .nth(3)
+        .nth(2)
         .and_then(|a| a.parse::<usize>().ok())
     {
         Some(r) => r,
@@ -63,7 +55,7 @@ fn main() {
         }
     };
 
-    if let Err(err) = procesar(id, path_pagos, path_fallidos) {
+    if let Err(err) = procesar(id, path_pagos) {
         println!("{}", err)
     }
 }

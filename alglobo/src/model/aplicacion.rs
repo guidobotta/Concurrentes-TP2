@@ -80,9 +80,9 @@ impl Aplicacion {
         receptor: &mut Receiver<Comando>,
         id: usize,
     ) -> Resultado<EstadoApp> {
-        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string())?));
+        let log = Arc::new(RwLock::new(Log::new()?));
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone())?;
-        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string())?;
+        let mut parser_fallidos = ParserFallidos::new()?;
         let mut inicio_lider = true;
         let mut transaccion;
         let mut prox_pago = 1;
@@ -158,9 +158,9 @@ impl Aplicacion {
         receptor: &mut Receiver<Comando>,
         id: usize,
     ) -> Resultado<EstadoApp> {
-        let log = Arc::new(RwLock::new(Log::new("./files/estado.log".to_string())?));
+        let log = Arc::new(RwLock::new(Log::new()?));
         let mut coordinador = CoordinadorTransaccion::new(id, log.clone())?;
-        let mut parser_fallidos = ParserFallidos::new("./files/fallidos.csv".to_string())?;
+        let mut parser_fallidos = ParserFallidos::new()?;
         let mut transaccion;
         let prox_pago = log
             .read()
