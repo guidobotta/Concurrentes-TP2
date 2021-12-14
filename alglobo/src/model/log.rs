@@ -84,7 +84,6 @@ impl Transaccion {
 pub struct Log {
     archivo: File,
     log: HashMap<usize, Transaccion>,
-    siguiente_id: usize,
     ultima_trans: Option<Transaccion>,
 }
 
@@ -101,7 +100,6 @@ impl Log {
 
         let mut log = Log {
             archivo,
-            siguiente_id: 1,
             log: HashMap::new(),
             ultima_trans: None,
         };
@@ -149,7 +147,7 @@ impl Log {
         format!("{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado)
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Procesa completamente el archivo de logs, inicializando las variables internas
     fn leer_archivo(&mut self) {
         let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE|FINALIZE)$")
             .expect("Error al crear la regex, posiblemente es invalida");
@@ -167,7 +165,6 @@ impl Log {
             let transaccion = self
                 .parsear_transaccion(cap)
                 .expect("Error al parsear transaccion");
-            self.siguiente_id = std::cmp::max(self.siguiente_id - 1, transaccion.id) + 1;
             ultimo_id = transaccion.id;
             self.log.insert(transaccion.id, transaccion);
         }

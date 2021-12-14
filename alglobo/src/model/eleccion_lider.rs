@@ -6,11 +6,16 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-const TEAM_MEMBERS: usize = 5;
-const TIMEOUT_LIDER: Duration = Duration::from_secs(6); // <- Si pasa este tiempo me hago lider
-const TIMEOUT_MENSAJE: Duration = Duration::from_secs(10); // <- Tolerancia a recibir un mensaje
-const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); // <- Frecuencia de enviado del keep alive
-const ID_LIDER_DEFAULT: usize = 0;
+/// Cantidad maxima de procesos en el sistema
+const TEAM_MEMBERS: usize = 7; 
+/// Tiempo de espera para proclamarse lider
+const TIMEOUT_LIDER: Duration = Duration::from_secs(6); 
+/// Tolerancia a recibir un mensaje
+const TIMEOUT_MENSAJE: Duration = Duration::from_secs(10);
+/// Frecuencia de enviado del keep alive
+const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); 
+/// ID de lider default, utilizado en sincronizacion
+const ID_LIDER_DEFAULT: usize = 0; 
 
 /// EleccionLider implementa la eleccion del lider y se encarga de mantener
 /// siempre un único lider activo a través del envío y recepción de mensajes
@@ -44,20 +49,6 @@ impl EleccionLider {
         Ok(ret)
     }
 
-    fn inicializar(&mut self) {
-        (0..TEAM_MEMBERS).for_each(|id| {
-            if id != self.id {
-                let _ = self.enviar(CodigoLider::VERIFICAR, id);
-            }
-        });
-
-        let mut threads = Vec::new();
-        let mut clone = self.clone();
-        threads.push(thread::spawn(move || clone.mantener_vivo()));
-        let mut clone = self.clone();
-        self.respondedor = Some(thread::spawn(move || clone.responder(threads)));
-    }
-
     /// Bloquea si nodo no es lider
     pub fn bloquear_si_no_soy_lider(&self) -> bool {
         let _e = self
@@ -73,7 +64,7 @@ impl EleccionLider {
                         id != self.id
                     } else {
                         true
-                    } //TODO: Creo que el else deberia ser true
+                    }
                 },
             )
             .expect("Error al tomar lock del id_lider en EleccionLider");
@@ -99,15 +90,6 @@ impl EleccionLider {
             )
             .expect("Error al tomar lock del id_lider en EleccionLider")
             .expect("Se obtuvo un id None")
-    }
-
-    // TODO: Documentacion
-    pub fn notificar_finalizacion(&mut self) {
-        (0..TEAM_MEMBERS).for_each(|id| {
-            if id != self.id {
-                let _ = self.enviar(CodigoLider::ELECCION, id);
-            }
-        });
     }
 
     /// Comienza la busqueda de un nuevo lider
@@ -173,6 +155,22 @@ impl EleccionLider {
     //                                                                //
     ////////////////////////////////////////////////////////////////////
 
+    /// Envia un mensaje "Verificar" a todos los procesos, inicializa los hilos respondedor y mantener vivo
+    fn inicializar(&mut self) {
+        (0..TEAM_MEMBERS).for_each(|id| {
+            if id != self.id {
+                let _ = self.enviar(CodigoLider::VERIFICAR, id);
+            }
+        });
+
+        let mut threads = Vec::new();
+        let mut clone = self.clone();
+        threads.push(thread::spawn(move || clone.mantener_vivo()));
+        let mut clone = self.clone();
+        self.respondedor = Some(thread::spawn(move || clone.responder(threads)));
+    }
+
+
     /// Enviar mensaje al nodo de id_destino
     fn enviar(&mut self, codigo: CodigoLider, id_destino: usize) -> Resultado<()> {
         let mensaje = MensajeLider::new(codigo, self.id);
@@ -184,6 +182,15 @@ impl EleccionLider {
     fn enviar_eleccion(&mut self) {
         ((self.id + 1)..TEAM_MEMBERS).for_each(|id| {
             let _ = self.enviar(CodigoLider::ELECCION, id);
+        });
+    }
+
+    /// Notifica a todos los procesos que finaliza su ejecucion a traves de un mensaje de "Eleccion"
+    fn notificar_finalizacion(&mut self) {
+        (0..TEAM_MEMBERS).for_each(|id| {
+            if id != self.id {
+                let _ = self.enviar(CodigoLider::ELECCION, id);
+            }
         });
     }
 
@@ -247,7 +254,7 @@ impl EleccionLider {
 
     /// Procesa un mensaje eleccion
     fn recibir_election(&mut self, threads: &mut Vec<JoinHandle<()>>, id_emisor: usize) {
-        println!("[Eleccion {}] recibí ELECCION de {}", self.id, id_emisor);
+        println!("[Eleccion {}] Recibí ELECCION de {}", self.id, id_emisor);
         let _ = self.enviar(CodigoLider::OK, id_emisor);
         let mut me = self.clone();
         if self
@@ -263,7 +270,7 @@ impl EleccionLider {
 
     /// Procesa un mensaje coordinador
     fn recibir_coordinador(&mut self, id_emisor: usize) {
-        println!("[Eleccion]: El lider es {}", id_emisor);
+        println!("[Eleccion]: Recibí COORDINADOR de {}", id_emisor);
         self.set_id_lider(Some(id_emisor), true);
     }
 

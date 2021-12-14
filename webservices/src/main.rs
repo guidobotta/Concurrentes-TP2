@@ -22,7 +22,7 @@ fn run() -> Resultado<()> {
 }
 
 fn main() {
-    println!("WEBSERVICE"); //TODO: Agregar finalizacion
+    println!("WEBSERVICE");
     if let Err(err) = run() {
         println!("{}", err);
     }

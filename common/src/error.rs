@@ -12,7 +12,7 @@ pub struct ErrorInterno {
 }
 
 impl ErrorInterno {
-    /// Genera una intancia de InternalError, el string recibido es utilizado para identificar el error.
+    /// Genera una intancia de ErrorInterno, el string recibido es utilizado para identificar el error.
     pub fn new(msg: &str) -> ErrorInterno {
         ErrorInterno {
             mensaje: msg.to_string(),
@@ -32,7 +32,7 @@ impl Error for ErrorInterno {
     }
 }
 
-// Enum para conversion de errores
+/// Enum para conversion de errores
 
 #[derive(Debug)]
 pub enum ErrorApp {
@@ -44,7 +44,7 @@ pub enum ErrorApp {
     ErrorParseoFloat(ParseFloatError)
 }
 
-// Tipo de resultado
+/// Tipo de resultado
 
 pub type Resultado<T> = std::result::Result<T, ErrorApp>;
 

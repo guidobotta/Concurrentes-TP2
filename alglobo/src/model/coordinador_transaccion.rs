@@ -8,7 +8,9 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+/// Cantidad de webservices disponibles
 const WEBSERVICES: usize = 3;
+/// Tolerancia a recibir las respuestas de todos los webservices
 const TIMEOUT_WEBSERVICES: Duration = Duration::from_secs(4);
 
 /// CoordinadorTransaccion implementa el manejo de transacciones a través del
@@ -50,7 +52,7 @@ impl CoordinadorTransaccion {
 
     /// Finaliza al coordinador
     pub fn finalizar(&mut self) {
-        self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
+        self.continuar.store(false, Ordering::Relaxed);
         if let Some(res) = self.respondedor.take() {
             let _ = res.join();
         }
@@ -151,7 +153,7 @@ impl CoordinadorTransaccion {
             .write()
             .expect("Error al tomar lock del log en Coordinador")
             .insertar(transaccion.finalize());
-        println!("[Coordinador]: Finalice de transaccion {}", transaccion.id);
+        println!("[Coordinador]: Finalize de transaccion {}", transaccion.id);
         res
     }
 
@@ -178,7 +180,7 @@ impl CoordinadorTransaccion {
             .write()
             .expect("Error al tomar lock del log en Coordinador")
             .insertar(transaccion.finalize());
-        println!("[Coordinador]: Finalice de transaccion {}", transaccion.id);
+        println!("[Coordinador]: Finalize de transaccion {}", transaccion.id);
         res
     }
 
@@ -255,7 +257,7 @@ impl CoordinadorTransaccion {
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {
                 CodigoTransaccion::READY | CodigoTransaccion::COMMIT | CodigoTransaccion::ABORT => {
-                    //println!("[Coordinador] recibí READY de {}", id_emisor);
+                    println!("[Coordinador] Recibí {:?} de {} para la transaccion {}", mensaje.codigo, id_emisor, mensaje.id_op);
                     respuestas
                         .0
                         .lock()
