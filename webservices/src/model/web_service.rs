@@ -64,7 +64,7 @@ impl WebService {
     /// Responde un prepare segun el estado de la transaccion
     fn responder_prepare(&mut self, mensaje: MensajeTransaccion, monto: f64) {
         println!(
-            "[WebService] Recibí PREPARE de {} para el pago {} con monto {}",
+            "[WebService] Recibí PREPARE de {} para la transaccion {} con monto {}",
             mensaje.id_emisor, mensaje.id_op, monto
         );
         let respuesta_ready =
@@ -111,7 +111,7 @@ impl WebService {
     /// Responde un commit segun el estado de la transaccion
     fn responder_commit(&mut self, mensaje: MensajeTransaccion) {
         println!(
-            "[WebService] Recibí COMMIT de {} para el pago {}",
+            "[WebService] Recibí COMMIT de {} para la transaccion {}",
             mensaje.id_emisor, mensaje.id_op
         );
 
@@ -136,7 +136,7 @@ impl WebService {
     /// Responde un abort segun el estado de la transaccion
     fn responder_abort(&mut self, mensaje: MensajeTransaccion) {
         println!(
-            "[WebService] Recibí ABORT de {} para el pago {}",
+            "[WebService] Recibí ABORT de {} para la transaccion {}",
             mensaje.id_emisor, mensaje.id_op
         );
 

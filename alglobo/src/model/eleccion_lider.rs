@@ -7,15 +7,15 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 /// Cantidad maxima de procesos en el sistema
-const TEAM_MEMBERS: usize = 7; 
+const TEAM_MEMBERS: usize = 7;
 /// Tiempo de espera para proclamarse lider
-const TIMEOUT_LIDER: Duration = Duration::from_secs(6); 
+const TIMEOUT_LIDER: Duration = Duration::from_secs(6);
 /// Tolerancia a recibir un mensaje
 const TIMEOUT_MENSAJE: Duration = Duration::from_secs(10);
 /// Frecuencia de enviado del keep alive
-const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2); 
+const TIMEOUT_MANTENER_VIVO: Duration = Duration::from_secs(2);
 /// ID de lider default, utilizado en sincronizacion
-const ID_LIDER_DEFAULT: usize = 0; 
+const ID_LIDER_DEFAULT: usize = 0;
 
 /// EleccionLider implementa la eleccion del lider y se encarga de mantener
 /// siempre un único lider activo a través del envío y recepción de mensajes
@@ -169,7 +169,6 @@ impl EleccionLider {
         let mut clone = self.clone();
         self.respondedor = Some(thread::spawn(move || clone.responder(threads)));
     }
-
 
     /// Enviar mensaje al nodo de id_destino
     fn enviar(&mut self, codigo: CodigoLider, id_destino: usize) -> Resultado<()> {

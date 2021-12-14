@@ -257,7 +257,10 @@ impl CoordinadorTransaccion {
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {
                 CodigoTransaccion::READY | CodigoTransaccion::COMMIT | CodigoTransaccion::ABORT => {
-                    println!("[Coordinador] Recibí {:?} de {} para la transaccion {}", mensaje.codigo, id_emisor, mensaje.id_op);
+                    println!(
+                        "[Coordinador] Recibí {:?} de {} para la transaccion {}",
+                        mensaje.codigo, id_emisor, mensaje.id_op
+                    );
                     respuestas
                         .0
                         .lock()
