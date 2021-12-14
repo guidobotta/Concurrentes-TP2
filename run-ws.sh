@@ -21,8 +21,8 @@ do
     gnome-terminal --title="WebService${j}" --geometry "100x20+0+$(($j*360))" -- ./2-webservices.sh $j
 done
 
-for i in `seq 0 $REPLICAS`
+for i in `seq 1 $(($REPLICAS + 1))`
 do
-    echo "Levanto Replica con id $i - $(($i+1))/$(($REPLICAS + 1))"
-    gnome-terminal --title="AlGlobo${i}" --geometry "100x20+960+$(($i*1080/($REPLICAS+1)))" -- ./1-alglobo.sh $i
+    echo "Levanto Replica con id $i - $i/$REPLICAS"
+    gnome-terminal --title="AlGlobo${i}" --geometry "100x20+960+$((($i-1)*1080/($REPLICAS+1)))" -- ./1-alglobo.sh $i
 done

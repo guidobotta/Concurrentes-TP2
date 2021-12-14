@@ -21,6 +21,7 @@ pub enum EstadoTransaccion {
     Prepare,
     Commit,
     Abort,
+    Finalize,
 }
 
 /// Representa una transaccion. Contiene información sobre el pago actual y
@@ -48,7 +49,7 @@ impl Transaccion {
         }
     }
 
-    // TODO: Documentacion
+    /// Devuelve el pago
     pub fn get_pago(&self) -> Option<Pago> {
         self.pago.as_ref().cloned()
     }
@@ -68,6 +69,12 @@ impl Transaccion {
     /// Cambiar el estado de la transacción a Abort.
     pub fn abort(&mut self) -> &Self {
         self.estado = EstadoTransaccion::Abort;
+        self
+    }
+
+    /// Cambiar el estado de la transacción a Finalize.
+    pub fn finalize(&mut self) -> &Self {
+        self.estado = EstadoTransaccion::Finalize;
         self
     }
 }
@@ -103,14 +110,11 @@ impl Log {
         Ok(log)
     }
 
-    // TODO: Documentacion
+    /// Crea una nueva transaccion inicializada y la devuelve
     pub fn nueva_transaccion(&self, id_pago: usize, id_prox_pago: usize) -> Transaccion {
         //La idea es que devuelva una transaccion semi inicializada, con el id seteado.
         //Luego habra que cargarle los demas campos
-        let id = self
-            .ultima_trans
-            .as_ref().map(|t| t.id)
-            .unwrap_or(0);
+        let id = self.ultima_trans.as_ref().map(|t| t.id).unwrap_or(0);
         Transaccion::new(id + 1, id_pago, id_prox_pago, EstadoTransaccion::Prepare)
     }
 
@@ -132,12 +136,13 @@ impl Log {
         self.ultima_trans = Some(transaccion.clone());
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Recibe una transaccion y devuelve un String formateado
     fn formatear_transaccion(&self, t: &Transaccion) -> String {
         let estado = match &t.estado {
             EstadoTransaccion::Commit => "COMMIT",
             EstadoTransaccion::Abort => "ABORT",
             EstadoTransaccion::Prepare => "PREPARE",
+            EstadoTransaccion::Finalize => "FINALIZE",
         };
 
         format!("{},{},{},{}", t.id, t.id_pago, t.id_pago_prox, estado)
@@ -145,8 +150,8 @@ impl Log {
 
     // TODO: Documentacion?? Es privada
     fn leer_archivo(&mut self) {
-        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE)$")
-        .expect("Error al crear la regex, posiblemente es invalida");
+        let matcher = Regex::new(r"^(\d+),(\d+),(\d+),(COMMIT|ABORT|PREPARE|FINALIZE)$")
+            .expect("Error al crear la regex, posiblemente es invalida");
         let reader = BufReader::new(&self.archivo);
 
         let mut ultimo_id = 0;
@@ -158,7 +163,9 @@ impl Log {
                 Some(value) => value,
             };
             //No deberia fallar si ya paso la regex
-            let transaccion = self.parsear_transaccion(cap).expect("Error al parsear transaccion");
+            let transaccion = self
+                .parsear_transaccion(cap)
+                .expect("Error al parsear transaccion");
             self.siguiente_id = std::cmp::max(self.siguiente_id - 1, transaccion.id) + 1;
             ultimo_id = transaccion.id;
             self.log.insert(transaccion.id, transaccion);
@@ -167,7 +174,7 @@ impl Log {
         self.ultima_trans = self.log.get(&ultimo_id).cloned();
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Recibe argumentos para crear una transaccion y la devuelve
     fn parsear_transaccion(&self, argumentos: regex::Captures) -> Resultado<Transaccion> {
         let trans_id = argumentos[1].parse::<usize>()?;
         let pago_id = argumentos[2].parse::<usize>()?;
@@ -178,6 +185,7 @@ impl Log {
             "COMMIT" => EstadoTransaccion::Commit,
             "ABORT" => EstadoTransaccion::Abort,
             "PREPARE" => EstadoTransaccion::Prepare,
+            "FINALIZE" => EstadoTransaccion::Finalize,
             _ => panic!("Estado erroneo"),
         };
 

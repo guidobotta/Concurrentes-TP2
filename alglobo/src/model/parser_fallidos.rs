@@ -62,12 +62,13 @@ impl ParserFallidos {
 
         if pago.is_some() {
             // TODO: ver esto, cambiar el path o si se puede hacer distinto
-            fs::write("./files/fallidos.csv", lines).expect("Error al escribir en el archivo de fallidos"); 
+            fs::write("./files/fallidos.csv", lines)
+                .expect("Error al escribir en el archivo de fallidos");
         }
         Ok(pago)
     }
 
-    // Escribe un pago fallido en el archivo de fallidos.
+    /// Escribe un pago fallido en el archivo de fallidos.
     pub fn escribir_fallido(&mut self, pago: Pago) {
         let _ = self.archivo.seek(io::SeekFrom::End(0));
         let salida = self.formatear_pago(pago);
@@ -78,7 +79,7 @@ impl ParserFallidos {
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Recibe un Pago y devuelve un String formateado
     fn formatear_pago(&self, pago: Pago) -> String {
         format!(
             "{},{:.2},{:.2}",

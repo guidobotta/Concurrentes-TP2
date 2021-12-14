@@ -9,7 +9,7 @@ use std::time::Duration;
 /// ELECCION: utilizado para llamar a elección.
 /// COORDINADOR: utilizado para avisar que hay un nuevo lider.
 /// VERIFICAR: utilizado para preguntar si el lider sigue activo.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum CodigoLider {
     OK,
     ELECCION,
@@ -19,7 +19,7 @@ pub enum CodigoLider {
 
 /// MensajeLider representa un mensaje utilizado para la comunicación en el
 /// algoritmo de elección de lider.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MensajeLider {
     pub codigo: CodigoLider,
     pub id_emisor: usize
@@ -62,7 +62,7 @@ impl MensajeLider {
 }
 
 impl PartialEq for MensajeLider {
-    // TODO: documentar?? Es privada
+    /// Devuelve verdadero si coinciden los codigos
     fn eq(&self, otro: &Self) -> bool {
         self.codigo == otro.codigo
     }

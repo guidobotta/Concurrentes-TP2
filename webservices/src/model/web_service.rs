@@ -55,13 +55,13 @@ impl WebService {
                     _ => println!(
                         "[WebService] Recibí algo que no puedo interpretar de {}",
                         mensaje.id_emisor
-                    )
+                    ),
                 }
-            }             
+            }
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Responde un prepare segun el estado de la transaccion
     fn responder_prepare(&mut self, mensaje: MensajeTransaccion, monto: f64) {
         println!(
             "[WebService] Recibí PREPARE de {} para el pago {} con monto {}",
@@ -108,7 +108,7 @@ impl WebService {
         };
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Responde un commit segun el estado de la transaccion
     fn responder_commit(&mut self, mensaje: MensajeTransaccion) {
         println!(
             "[WebService] Recibí COMMIT de {} para el pago {}",
@@ -133,7 +133,7 @@ impl WebService {
         };
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Responde un abort segun el estado de la transaccion
     fn responder_abort(&mut self, mensaje: MensajeTransaccion) {
         println!(
             "[WebService] Recibí ABORT de {} para el pago {}",
@@ -163,7 +163,7 @@ impl WebService {
         self.insertar_y_enviar(EstadoServicio::Abort, respuesta, mensaje.id_emisor);
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Actualiza el log de transacciones y envia mensaje
     fn insertar_y_enviar(
         &mut self,
         estado: EstadoServicio,
@@ -180,14 +180,14 @@ impl WebService {
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Simula trabajo por un tiempo random
     fn simular_trabajo(&self) {
         let mut rng = rand::thread_rng();
         let tiempo_trabajo = rng.gen_range(self.envs.trabajo_min..self.envs.trabajo_max);
         thread::sleep(Duration::from_millis(tiempo_trabajo));
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Simula un resultado segun una probabilidad de fallo
     fn simular_resultado(&self) -> Result<(), ()> {
         let mut rng = rand::thread_rng();
         let ok = rng.gen::<f32>() >= self.envs.probabilidad_fallo;

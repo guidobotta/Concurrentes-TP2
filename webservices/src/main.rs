@@ -2,7 +2,6 @@ mod model;
 use common::error::Resultado;
 use model::web_service::WebService;
 
-// TODO: Documentacion?? Es privada
 fn run() -> Resultado<()> {
     let id = match std::env::args()
         .nth(1)
@@ -17,12 +16,14 @@ fn run() -> Resultado<()> {
     };
 
     let mut web_service = WebService::new(id)?;
-    
-    Ok(web_service.run())
+
+    web_service.run();
+    Ok(())
 }
 
-// TODO: Documentacion?? Es privada
 fn main() {
     println!("WEBSERVICE"); //TODO: Agregar finalizacion
-    if let Err(err) = run() { println!("{}", err); }
+    if let Err(err) = run() {
+        println!("{}", err);
+    }
 }

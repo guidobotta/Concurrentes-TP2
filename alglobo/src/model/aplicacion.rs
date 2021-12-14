@@ -17,11 +17,11 @@ pub struct Aplicacion {
     handle: JoinHandle<()>,
 }
 
-/// EstadoApp representa el estado de la aplicación.
+/// EstadoApp representa el estado de la aplicacion.
 /// # Variantes
-/// FinEntrada: simboliza TODO: COMPLETAR DOCUMENTACION
-/// CambioLider: simboliza TODO: COMPLETAR DOCUMENTACION
-/// Finalizar: simboliza TODO: COMPLETAR DOCUMENTACION
+/// FinEntrada: simboliza el fin del archivo de entrada
+/// CambioLider: simboliza un cambio de lider
+/// Finalizar: simboliza la finalizacion del proceso
 pub enum EstadoApp {
     FinEntrada,
     CambioLider,
@@ -41,7 +41,7 @@ impl Aplicacion {
         })
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Proceso principal para el proceso de transacciones
     fn procesar(
         id: usize,
         mut lider: EleccionLider,
@@ -51,7 +51,6 @@ impl Aplicacion {
         let mut estado = EstadoApp::CambioLider;
 
         while lider.bloquear_si_no_soy_lider() {
-            //TODO: Ver que hacer con los errores
             match estado {
                 EstadoApp::CambioLider => {
                     match Aplicacion::procesar_lider(&lider, &mut parseador, &mut receptor, id) {
@@ -74,7 +73,7 @@ impl Aplicacion {
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Proceso para cuando el nodo es lider
     fn procesar_lider(
         lider: &EleccionLider,
         parseador: &mut Parser,
@@ -106,7 +105,9 @@ impl Aplicacion {
                 prox_pago = transaccion.id_pago_prox;
                 transaccion.pago = match parseador.parsear(Some(transaccion.id_pago)).ok() {
                     Some(Some(p)) => Some(p),
-                    _ => panic!("[Aplicacion] El log de transacciones no matchea con el archivo de entrada")
+                    _ => panic!(
+                        "[Aplicacion] El log de transacciones no matchea con el archivo de entrada"
+                    ),
                 };
             } else if let Ok(comando) = receptor.try_recv() {
                 let id_reintento = match comando {
@@ -130,7 +131,7 @@ impl Aplicacion {
                 transaccion.pago = match parseador.parsear(Some(prox_pago)).ok() {
                     Some(None) => return Ok(EstadoApp::FinEntrada),
                     Some(p) => p,
-                    _ => panic!("[Aplicacion] Error al parsear del archivo de entrada")
+                    _ => panic!("[Aplicacion] Error al parsear del archivo de entrada"),
                 };
                 prox_pago += 1;
             }
@@ -142,14 +143,16 @@ impl Aplicacion {
                     &transaccion.id_pago
                 );
 
-                if let Some(p) = transaccion.get_pago() { parser_fallidos.escribir_fallido(p) }
+                if let Some(p) = transaccion.get_pago() {
+                    parser_fallidos.escribir_fallido(p)
+                }
             }
         }
 
         Ok(EstadoApp::CambioLider)
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Proceso para cuando el archivo de entrada finalizo
     fn procesar_fallidos(
         lider: &EleccionLider,
         receptor: &mut Receiver<Comando>,
@@ -187,7 +190,9 @@ impl Aplicacion {
                         "[Aplicacion]: El pago de id {} ha fallado",
                         &transaccion.id_pago
                     );
-                    if let Some(p) = transaccion.get_pago() { parser_fallidos.escribir_fallido(p) }
+                    if let Some(p) = transaccion.get_pago() {
+                        parser_fallidos.escribir_fallido(p)
+                    }
                 }
             }
         }
@@ -195,14 +200,13 @@ impl Aplicacion {
         Ok(EstadoApp::CambioLider)
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Procesa un comando recibido de la entrada estandar
     fn procesar_comando(
         id_reintento: usize,
         parser: &mut ParserFallidos,
         log: &Arc<RwLock<Log>>,
         prox_pago: usize,
     ) -> Resultado<Option<Transaccion>> {
-        // TODO: LE CAMBIE EL ? POR UNWRAP()
         let mut transaccion = log
             .read()
             .expect("Error al tomar lock del log en Aplicacion")
@@ -226,7 +230,7 @@ impl Aplicacion {
         Ok(Some(transaccion))
     }
 
-    // TODO: Documentacion
+    /// Realiza join sobre hilo
     pub fn join(self) {
         let _ = self.handle.join();
     }

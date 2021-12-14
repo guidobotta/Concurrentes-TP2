@@ -38,7 +38,7 @@ impl CoordinadorTransaccion {
             destinatarios: vec![0, 1, 2]
                 .iter()
                 .map(|id| DNS::direccion_webservice(id))
-                .collect(), // TODO: cambiar esto
+                .collect(),
             continuar: continuar.clone(),
             respondedor: Some(thread::spawn(move || {
                 CoordinadorTransaccion::responder(protocolo, respuestas, continuar)
@@ -48,7 +48,7 @@ impl CoordinadorTransaccion {
         Ok(ret)
     }
 
-    // TODO: Documentacion
+    /// Finaliza al coordinador
     pub fn finalizar(&mut self) {
         self.continuar.store(false, Ordering::Relaxed); //Ver si el Ordering Relaxed esta bien
         if let Some(res) = self.respondedor.take() {
@@ -66,28 +66,29 @@ impl CoordinadorTransaccion {
         match trans_en_log {
             None => self.full_protocol(transaccion),
             Some(t) => match t.estado {
-                EstadoTransaccion::Prepare => self.full_protocol(transaccion), //TODO: Ver esto
+                EstadoTransaccion::Prepare => self.full_protocol(transaccion),
                 EstadoTransaccion::Commit => self.commit(transaccion),
                 EstadoTransaccion::Abort => {
                     let _ = self.abort(transaccion);
                     Err(ErrorApp::Interno(ErrorInterno::new("Transaccion abortada")))
                 }
+                EstadoTransaccion::Finalize => Ok(()),
             },
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Ejecuta el protocolo completo para la transaccion
     fn full_protocol(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         match self.prepare(transaccion) {
-            Ok(_) => self.commit(transaccion), // TODO: ver que hacer con el result de estos (quizas reintentar commit)
+            Ok(_) => self.commit(transaccion),
             Err(e) => {
-                let _ = self.abort(transaccion); // TODO: ver que hacer con el result de estos y tema de escribir para reintentar
+                let _ = self.abort(transaccion);
                 Err(e)
             }
         }
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Ejecuta el prepare para la transaccion
     fn prepare(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log
             .write()
@@ -99,7 +100,6 @@ impl CoordinadorTransaccion {
         let pago = transaccion
             .get_pago()
             .expect("Intento de ejecutar transaccion sin pago");
-        //TODO: Hay que cambiar en el Mensaje el id_op por id_transaccion, sino no vamos a poder reintentar.
         // Preparo los mensajes a enviar
         let m_hotel = MensajeTransaccion::new(
             CodigoTransaccion::PREPARE {
@@ -121,15 +121,15 @@ impl CoordinadorTransaccion {
             },
             self.id,
             id_op,
-        ); // TODO: PASAR ESTO AL PARSER
+        );
 
         // Mensaje esperado
-        let esperado = MensajeTransaccion::new(CodigoTransaccion::READY, self.id, id_op); // TODO: PASAR ESTO AL PARSER
+        let esperado = MensajeTransaccion::new(CodigoTransaccion::READY, self.id, id_op);
 
         self.send_and_wait(vec![m_hotel, m_aerolinea, m_banco], esperado, false)
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Ejecuta el commit para la transaccion
     fn commit(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log
             .write()
@@ -139,16 +139,23 @@ impl CoordinadorTransaccion {
         let id_op = transaccion.id;
 
         // Preparo los mensajes a enviar y mensaje esperado
-        let mensaje = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, id_op); // TODO: pensar si hacer que esperado sea finished o no
+        let mensaje = MensajeTransaccion::new(CodigoTransaccion::COMMIT, self.id, id_op);
 
-        self.send_and_wait(
+        let res = self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
-            true
-        )
+            true,
+        );
+
+        self.log
+            .write()
+            .expect("Error al tomar lock del log en Coordinador")
+            .insertar(transaccion.finalize());
+        println!("[Coordinador]: Finalice de transaccion {}", transaccion.id);
+        res
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Ejecuta el abort para la transaccion
     fn abort(&mut self, transaccion: &mut Transaccion) -> Resultado<()> {
         self.log
             .write()
@@ -161,21 +168,27 @@ impl CoordinadorTransaccion {
         // Preparo los mensajes a enviar y mensaje esperado
         let mensaje = MensajeTransaccion::new(CodigoTransaccion::ABORT, self.id, id_op);
 
-        self.send_and_wait(
+        let res = self.send_and_wait(
             vec![mensaje.clone(), mensaje.clone(), mensaje.clone()],
             mensaje,
-            true
-        )
+            true,
+        );
+
+        self.log
+            .write()
+            .expect("Error al tomar lock del log en Coordinador")
+            .insertar(transaccion.finalize());
+        println!("[Coordinador]: Finalice de transaccion {}", transaccion.id);
+        res
     }
 
-    // TODO: Documentacion?? Es privada
-    //Queremos que se encargue de enviarle los mensajes a los destinatarios
-    //y espere por sus respuestas, con un timeout y numero de intentos dado
+    /// Envia el mensaje a todos los destinatarios y espera por sus respuestas
+    /// con un timeout definido. En caso de timeout vuelve a enviar.
     fn send_and_wait(
         &mut self,
         mensajes: Vec<MensajeTransaccion>,
         esperado: MensajeTransaccion,
-        mensaje_critico: bool
+        mensaje_critico: bool,
     ) -> Resultado<()> {
         loop {
             let respuestas;
@@ -200,13 +213,11 @@ impl CoordinadorTransaccion {
             );
 
             let mensajes_esperados = match &respuestas {
-                Ok(val) if !val.1.timed_out() => {
-                    respuestas
+                Ok(val) if !val.1.timed_out() => respuestas
                     .expect("Error al tomar lock de respuestas en Coordinador")
                     .0
                     .iter()
-                    .all(|opt| opt.as_ref().map_or(false, |r| r == &esperado))
-                }
+                    .all(|opt| opt.as_ref().map_or(false, |r| r == &esperado)),
                 _ => {
                     println!(
                         "[Coordinador] Timeout de recepcion a webservices, reintentando id {}",
@@ -216,9 +227,11 @@ impl CoordinadorTransaccion {
                 }
             };
 
-            if mensajes_esperados { break; }
-            else if mensaje_critico { continue; }
-            else {
+            if mensajes_esperados {
+                break;
+            } else if mensaje_critico {
+                continue;
+            } else {
                 return Err(ErrorApp::Interno(ErrorInterno::new(
                     "Respuesta no esperada",
                 )));
@@ -228,7 +241,7 @@ impl CoordinadorTransaccion {
         Ok(())
     }
 
-    // TODO: Documentacion?? Es privada
+    /// Recibe mensajes de los webservices y guarda el resultado.
     fn responder(
         mut protocolo: ProtocoloTransaccion,
         respuestas: Arc<(Mutex<Vec<Option<MensajeTransaccion>>>, Condvar)>,
@@ -238,7 +251,7 @@ impl CoordinadorTransaccion {
             let mensaje = match protocolo.recibir(Some(TIMEOUT_WEBSERVICES)) {
                 Ok(m) => m,
                 Err(_) => continue,
-            }; // TODO: Revisar si hacer esto es correcto
+            };
             let id_emisor = mensaje.id_emisor;
             match mensaje.codigo {
                 CodigoTransaccion::READY | CodigoTransaccion::COMMIT | CodigoTransaccion::ABORT => {
@@ -261,7 +274,7 @@ impl CoordinadorTransaccion {
     }
 }
 
-// TODO: Documentacion
+/// Finaliza al coordinador
 impl Drop for CoordinadorTransaccion {
     fn drop(&mut self) {
         self.finalizar();

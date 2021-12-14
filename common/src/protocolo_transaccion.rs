@@ -68,7 +68,7 @@ impl MensajeTransaccion {
 }
 
 impl PartialEq for MensajeTransaccion {
-    // TODO: documentar?? Es privada
+    /// Devuelve verdadero si el codigo y el id_op coinciden
     fn eq(&self, otro: &Self) -> bool {
         self.codigo == otro.codigo && self.id_op == self.id_op
     }
