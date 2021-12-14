@@ -38,11 +38,54 @@ impl EleccionLider {
             respondedor: None,
         };
 
-        let mut clone = ret.clone();
-        ret.respondedor = Some(thread::spawn(move || clone.responder()));
+        let hay_lider = ret.buscar_si_existe_lider();
 
-        ret.buscar_nuevo_lider();
+        let mut threads = Vec::new();
+
+        match hay_lider {
+            Some(id_lider) => {
+                ret.set_id_lider(Some(id_lider), true);
+                let mut clone = ret.clone();
+                threads.push(thread::spawn(move || clone.mantener_vivo()));
+                let mut clone = ret.clone();
+                ret.respondedor = Some(thread::spawn(move || clone.responder(threads)));
+            },
+            None => {
+                let mut clone = ret.clone();
+                ret.respondedor = Some(thread::spawn(move || clone.responder(threads)));
+                ret.buscar_nuevo_lider()
+            }
+        }
+
         Ok(ret)
+    }
+
+    fn buscar_si_existe_lider(&mut self) -> Option<usize> {
+        println!("Envio a {:?} un VERIFICAR", (0..TEAM_MEMBERS));
+        (0..TEAM_MEMBERS).for_each(|id| {
+            if id != self.id {
+                let _ = self.enviar(CodigoLider::VERIFICAR, id);
+            }
+        });
+
+        println!("Procedo a la recibicion de mensajes");
+        let mut duracion = 2000;
+        loop {
+            duracion -= 200;
+            if duracion < 1000 { break }
+            
+            match self.protocolo.recibir(Some(Duration::from_millis(duracion))) {
+                Ok(mensaje) => {
+                    println!("Recibí {:?}", mensaje.codigo);
+                    if let CodigoLider::OK = mensaje.codigo {
+                        return Some(mensaje.id_emisor);
+                    }
+                }
+                Err(_) => break
+            };
+        }
+
+        None
     }
 
     // TODO: Documentacion
@@ -159,9 +202,7 @@ impl EleccionLider {
         if notificar {self.id_lider.1.notify_all();}
     }
 
-    fn responder(&mut self) {
-        let mut threads = Vec::new();
-
+    fn responder(&mut self, mut threads: Vec<JoinHandle<()>>) {
         while !self.stop.load(Ordering::Relaxed) { //TODO: Cambiar a AtomicBool
             // TODO: revisar el timeout
             if let Ok(mensaje) = self.protocolo.recibir(Some(TIMEOUT_MENSAJE)) {
